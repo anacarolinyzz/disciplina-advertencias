@@ -1,0 +1,2 @@
+Esse arquivo serve para listar todas as bibliotecas externas e suas versões exatas que um projeto em Python precisa para funcionar.
+Iremos adicionar depois, mas talvez vamos usar usar o Flutter, daí esse arquivo será o "pubspec.yaml".
