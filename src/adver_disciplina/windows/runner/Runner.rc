@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "br.carolzinha.com" "\0"
-            VALUE "FileDescription", "teste_aprofundado" "\0"
+            VALUE "FileDescription", "adver" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "teste_aprofundado" "\0"
+            VALUE "InternalName", "adver" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 br.carolzinha.com. All rights reserved." "\0"
-            VALUE "OriginalFilename", "teste_aprofundado.exe" "\0"
-            VALUE "ProductName", "teste_aprofundado" "\0"
+            VALUE "OriginalFilename", "adver.exe" "\0"
+            VALUE "ProductName", "adver" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
