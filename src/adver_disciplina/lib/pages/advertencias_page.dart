@@ -1,6 +1,5 @@
-import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 
 import 'package:adver/services/dados_service.dart';
 import 'package:adver/widget/appbar_principal.dart';

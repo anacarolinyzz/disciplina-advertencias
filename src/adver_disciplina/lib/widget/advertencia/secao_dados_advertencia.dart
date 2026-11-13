@@ -144,7 +144,7 @@ class SecaoDadosAdvertencia extends StatelessWidget {
         const Text('Justificativa Legal', style: TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: justificativaSelecionada,
+          initialValue: justificativaSelecionada,
           hint: const Text('Selecione...'),
           isExpanded: true,
           items: justificativas.map((j) {

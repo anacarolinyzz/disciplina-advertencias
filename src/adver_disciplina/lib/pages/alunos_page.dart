@@ -1,7 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:excel_plus/excel_plus.dart' hide Border;  
+import 'package:excel_plus/excel_plus.dart' hide Border;
 
 import 'package:adver/widget/navigation_drawer.dart';
 import 'package:adver/widget/appbar_principal.dart';
@@ -52,6 +52,9 @@ class _AlunosPageState extends State<AlunosPage> {
     super.dispose();
   }
 
+  // =========================================================
+  // NORMALIZAÇÃO E FILTROS
+  // =========================================================
 
   String _normalizarTexto(String texto) {
     return texto
@@ -76,7 +79,102 @@ class _AlunosPageState extends State<AlunosPage> {
         .contains(_normalizarTexto(curso));
   }
 
+  List<String> get _turmasDisponiveis {
+    final alunosDoCurso = _cursoSelecionado == null
+        ? _alunos
+        : _alunos.where(
+            (aluno) => _alunoPertenceAoCurso(
+              aluno,
+              _cursoSelecionado!,
+            ),
+          ).toList();
 
+    final turmas = alunosDoCurso
+        .map((aluno) => aluno.turma.trim())
+        .where((turma) => turma.isNotEmpty)
+        .toSet()
+        .toList();
+
+    turmas.sort(
+      (a, b) => a.toLowerCase().compareTo(b.toLowerCase()),
+    );
+
+    return turmas;
+  }
+
+  void _atualizarLista() {
+    final pesquisa =
+        _normalizarTexto(_pesquisaController.text);
+
+    final resultado = _alunos.where((aluno) {
+      final correspondePesquisa =
+          pesquisa.isEmpty ||
+          _normalizarTexto(aluno.nome).contains(pesquisa) ||
+          _normalizarTexto(aluno.matricula).contains(pesquisa);
+
+      final correspondeCurso =
+          _cursoSelecionado == null ||
+          _alunoPertenceAoCurso(
+            aluno,
+            _cursoSelecionado!,
+          );
+
+      final correspondeTurma =
+          _turmaSelecionada == null ||
+          _normalizarTexto(aluno.turma) ==
+              _normalizarTexto(_turmaSelecionada!);
+
+      return correspondePesquisa &&
+          correspondeCurso &&
+          correspondeTurma;
+    }).toList();
+
+    // Ordena os alunos pelo nome, de A até Z.
+    resultado.sort(
+      (a, b) => _normalizarTexto(a.nome)
+          .compareTo(_normalizarTexto(b.nome)),
+    );
+
+    _alunosFiltrados = resultado;
+  }
+
+  void _pesquisarAlunos(String texto) {
+    setState(() {
+      _atualizarLista();
+    });
+  }
+
+  void _selecionarCurso(String? curso) {
+    setState(() {
+      _cursoSelecionado = curso;
+
+      // Reinicia a turma ao trocar de curso.
+      _turmaSelecionada = null;
+
+      _atualizarLista();
+    });
+  }
+
+  void _selecionarTurma(String? turma) {
+    setState(() {
+      _turmaSelecionada = turma;
+      _atualizarLista();
+    });
+  }
+
+  void _limparFiltros() {
+    setState(() {
+      _cursoSelecionado = null;
+      _turmaSelecionada = null;
+      _pesquisaController.clear();
+
+      _atualizarLista();
+    });
+  }
+
+  // =========================================================
+  // CARREGAMENTO DOS ALUNOS E ADVERTÊNCIAS
+  // =========================================================
 
   Future<void> _carregarAlunos() async {
     try {
@@ -118,104 +216,9 @@ class _AlunosPageState extends State<AlunosPage> {
     }
   }
 
-
-  List<String> get _turmasDisponiveis {
-    final alunosDoCurso = _cursoSelecionado == null
-        ? _alunos
-        : _alunos.where(
-            (aluno) => _alunoPertenceAoCurso(
-              aluno,
-              _cursoSelecionado!,
-            ),
-          ).toList();
-
-    final turmas = alunosDoCurso
-        .map((aluno) => aluno.turma.trim())
-        .where((turma) => turma.isNotEmpty)
-        .toSet()
-        .toList();
-
-    turmas.sort(
-      (a, b) => a.toLowerCase().compareTo(b.toLowerCase()),
-    );
-
-    return turmas;
-  }
-
-  void _atualizarLista() {
-    final pesquisa =
-        _normalizarTexto(_pesquisaController.text);
-
-    final resultado = _alunos.where((aluno) {
-      // Pesquisa por nome ou matrícula.
-      final correspondePesquisa =
-          pesquisa.isEmpty ||
-          _normalizarTexto(aluno.nome).contains(pesquisa) ||
-          _normalizarTexto(aluno.matricula).contains(pesquisa);
-
-      // Filtro por curso.
-      final correspondeCurso =
-          _cursoSelecionado == null ||
-          _alunoPertenceAoCurso(
-            aluno,
-            _cursoSelecionado!,
-          );
-
-      // Filtro por turma.
-      final correspondeTurma =
-          _turmaSelecionada == null ||
-          _normalizarTexto(aluno.turma) ==
-              _normalizarTexto(_turmaSelecionada!);
-
-      return correspondePesquisa &&
-          correspondeCurso &&
-          correspondeTurma;
-    }).toList();
-
-    // Ordena os alunos pelo nome
-    resultado.sort(
-      (a, b) => _normalizarTexto(a.nome)
-          .compareTo(_normalizarTexto(b.nome)),
-    );
-
-    _alunosFiltrados = resultado;
-  }
-
-  void _pesquisarAlunos(String texto) {
-    setState(() {
-      _atualizarLista();
-    });
-  }
-
-  void _selecionarCurso(String? curso) {
-    setState(() {
-      _cursoSelecionado = curso;
-
-      // Reinicia a turma ao trocar de curso
-      _turmaSelecionada = null;
-
-      _atualizarLista();
-    });
-  }
-
-  void _selecionarTurma(String? turma) {
-    setState(() {
-      _turmaSelecionada = turma;
-      _atualizarLista();
-    });
-  }
-
-  void _limparFiltros() {
-    setState(() {
-      _cursoSelecionado = null;
-      _turmaSelecionada = null;
-      _pesquisaController.clear();
-
-      _atualizarLista();
-    });
-  }
-
- 
+  // =========================================================
+  // LEITURA E TRATAMENTO DAS CÉLULAS DO EXCEL
+  // =========================================================
 
   String _obterTextoCelula(dynamic celula) {
     final valor = celula?.value;
@@ -255,7 +258,9 @@ class _AlunosPageState extends State<AlunosPage> {
     };
   }
 
-
+  // =========================================================
+  // NORMALIZAÇÃO DOS CABEÇALHOS DO EXCEL
+  // =========================================================
 
   String _normalizarCabecalho(String texto) {
     return texto
@@ -289,9 +294,9 @@ class _AlunosPageState extends State<AlunosPage> {
     return -1;
   }
 
-
-  // excel
-  
+  // =========================================================
+  // IMPORTAÇÃO DO EXCEL
+  // =========================================================
 
   Future<void> _importarAlunos() async {
     try {
@@ -327,7 +332,7 @@ class _AlunosPageState extends State<AlunosPage> {
         throw Exception('A planilha está vazia.');
       }
 
-      // Identifica as colunas
+      // Identifica as colunas.
       final cabecalhos = aba.rows.first.map((celula) {
         return _normalizarCabecalho(
           _obterTextoCelula(celula),
@@ -380,7 +385,7 @@ class _AlunosPageState extends State<AlunosPage> {
         );
       }
 
-      // Lê os alunos
+      // Lê os alunos.
       final alunosImportados = <Aluno>[];
       final matriculasEncontradas = <String>{};
 
@@ -405,7 +410,7 @@ class _AlunosPageState extends State<AlunosPage> {
         final curso = obterValor(colunaCurso);
         final turma = obterValor(colunaTurma);
 
-        // Ignora linhas totalmente vazias
+        // Ignora linhas totalmente vazias.
         if (matricula.isEmpty &&
             nome.isEmpty &&
             curso.isEmpty &&
@@ -413,7 +418,7 @@ class _AlunosPageState extends State<AlunosPage> {
           continue;
         }
 
-        // Ignora registros incompletos
+        // Ignora registros incompletos.
         if (matricula.isEmpty ||
             nome.isEmpty ||
             curso.isEmpty ||
@@ -422,7 +427,7 @@ class _AlunosPageState extends State<AlunosPage> {
           continue;
         }
 
-        // Evita matrículas repetidas no arquivo
+        // Evita matrículas repetidas no arquivo.
         if (!matriculasEncontradas.add(matricula)) {
           linhasDuplicadas++;
           continue;
@@ -444,7 +449,7 @@ class _AlunosPageState extends State<AlunosPage> {
         );
       }
 
-      // Salva os alunos
+      // Salva os alunos.
       final resultado =
           await DadosService.instancia.importarAlunos(
         alunosImportados,
@@ -477,7 +482,9 @@ class _AlunosPageState extends State<AlunosPage> {
     }
   }
 
- 
+  // =========================================================
+  // MENSAGENS
+  // =========================================================
 
   void _mostrarMensagem(String mensagem) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -523,7 +530,9 @@ class _AlunosPageState extends State<AlunosPage> {
     );
   }
 
- 
+  // =========================================================
+  // CAMPO DE PESQUISA
+  // =========================================================
 
   Widget _construirPesquisa() {
     return SizedBox(
@@ -548,13 +557,15 @@ class _AlunosPageState extends State<AlunosPage> {
     );
   }
 
-
+  // =========================================================
+  // FILTRO DE CURSO
+  // =========================================================
 
   Widget _construirFiltroCurso() {
     return SizedBox(
       width: 220,
       child: DropdownButtonFormField<String>(
-        value: _cursoSelecionado,
+  initialValue: _cursoSelecionado,
         isExpanded: true,
         decoration: const InputDecoration(
           labelText: 'Curso',
@@ -585,7 +596,7 @@ class _AlunosPageState extends State<AlunosPage> {
     return SizedBox(
       width: 200,
       child: DropdownButtonFormField<String>(
-        value: _turmaSelecionada,
+  initialValue: _turmaSelecionada,
         isExpanded: true,
         decoration: const InputDecoration(
           labelText: 'Turma',
@@ -610,7 +621,9 @@ class _AlunosPageState extends State<AlunosPage> {
     );
   }
 
-  
+  // =========================================================
+  // TABELA DE ALUNOS
+  // =========================================================
 
   Widget _construirTabela() {
     if (_alunosFiltrados.isEmpty) {
@@ -676,7 +689,6 @@ class _AlunosPageState extends State<AlunosPage> {
     );
   }
 
-  
 
   @override
   Widget build(BuildContext context) {
@@ -739,7 +751,7 @@ class _AlunosPageState extends State<AlunosPage> {
 
                   const SizedBox(height: 28),
 
-                  // Indicadores
+                  // Indicadores.
                   Wrap(
                     spacing: 24,
                     runSpacing: 12,
@@ -759,7 +771,7 @@ class _AlunosPageState extends State<AlunosPage> {
 
                   const SizedBox(height: 28),
 
-                  // pesquisa e filtros
+                  // Pesquisa e filtros.
                   const Text(
                     'Buscar e filtrar alunos',
                     style: TextStyle(

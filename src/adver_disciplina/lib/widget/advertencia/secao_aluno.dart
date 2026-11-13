@@ -10,7 +10,7 @@ class SecaoAluno extends StatelessWidget {
   final List<AlunoMap> listaAlunosCadastrados;
   final Function(AlunoMap) onAlunoSelecionado;
   final Function(String) onRemoverAlunoLote;
-
+  
   const SecaoAluno({
     super.key,
     required this.emLote,
@@ -110,7 +110,7 @@ class SecaoAluno extends StatelessWidget {
                       width: constraints.maxWidth,
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: Colors.grey.withOpacity(0.3),
+                          color: Colors.grey.withValues(alpha: 0.5),
                         ),
                         borderRadius: BorderRadius.circular(8),
                       ),
