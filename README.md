@@ -1,8 +1,8 @@
-# disciplina-advertencias
-Nome do Projeto: Adver
-Setor escolhido: Coordenação de Disciplina
-Facilitar a aplicação de advertências nos alunos e organização dos relatórios de comportamento(quantas advertências cada aluno tem)
-Nomes: Ana Caroliny Rodrigues de Sousa, Fabrício José Rodrigues De Sousa, Lívia de Sousa Campos e Raylane Sousa Silva
-stack tecnológico ultilizado: Dart, Flutter, Python, Flask e MySQL
-status atual: Em andamento - Marco 1: ambiente configurado
- 
+#ADVER – Sistema de Gestão Disciplinar
+
+O Adver é um sistema desenvolvido para auxiliar o setor de Disciplina no gerenciamento de ocorrências e advertências escolares. O projeto tem como objetivo reduzir processos manuais, centralizar informações e facilitar o acompanhamento da situação disciplinar dos alunos.
+
+
+Status do projeto
+
+O Adver está em desenvolvimento. Novas funcionalidades e melhorias estão sendo implementadas gradualmente.

@@ -1,125 +1,347 @@
+
 import 'package:flutter/material.dart';
+
 import 'package:adver/widget/navigation_drawer.dart';
 import 'package:adver/widget/appbar_principal.dart';
-import 'package:adver/widget/stat_card.dart';
-import 'package:adver/widget/tabela.dart';
+import 'package:adver/widget/home/stat_card.dart';
+import 'package:adver/widget/home/tabela.dart';
 
+import 'package:adver/models/aluno.dart';
+import 'package:adver/models/advertencia.dart';
 
+import 'package:adver/services/dados_service.dart';
+import 'package:adver/services/estatisticas_service.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _totalAlunos = 0;
+  int _totalAdvertencias = 0;
+  int _alunosComTresOuMais = 0;
+  int _advertenciasNesteMes = 0;
+
+  bool _carregando = true;
+
+  List<Map<String, dynamic>> _rankingAlunos = [];
+
+  List<Advertencia> _ultimasAdvertencias = [];
+
+  Map<String, Aluno> _alunosPorMatricula = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarEstatisticas();
+  }
+
+  Future<void> _carregarEstatisticas() async {
+    try {
+      final List<Aluno> alunos =
+          await DadosService.instancia.listarAlunos();
+
+      final List<Advertencia> advertencias =
+          await DadosService.instancia.listarAdvertencias();
+
+      final ranking = EstatisticasService.rankingAlunos(
+        alunos,
+        advertencias,
+      );
+
+      // Organiza as advertências da mais recente para a mais antiga.
+      final recentes = List<Advertencia>.from(advertencias);
+
+      recentes.sort((a, b) {
+        return b.data.compareTo(a.data);
+      });
+
+      final alunosMap = {
+        for (final aluno in alunos)
+          aluno.matricula: aluno,
+      };
+
+      if (!mounted) return;
+
+      setState(() {
+        _totalAlunos =
+            EstatisticasService.totalAlunos(alunos);
+
+        _totalAdvertencias =
+            EstatisticasService.totalAdvertencias(advertencias);
+
+        _alunosComTresOuMais =
+            EstatisticasService.alunosComTresOuMais(
+          alunos,
+          advertencias,
+        );
+
+        _advertenciasNesteMes =
+            EstatisticasService.advertenciasNesteMes(
+          advertencias,
+        );
+
+        _rankingAlunos = ranking.take(5).toList();
+
+        _ultimasAdvertencias = recentes.take(5).toList();
+
+        _alunosPorMatricula = alunosMap;
+
+        _carregando = false;
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar estatísticas: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _carregando = false;
+      });
+    }
+  }
+
+  Future<void> _abrirAdvertencia() async {
+    final resultado = await Navigator.pushNamed(
+      context,
+      '/advertencia',
+    );
+
+    if (resultado == true) {
+      await _carregarEstatisticas();
+    }
+  }
+
+  void _abrirRelatorio(String tipo) {
+    Navigator.pushNamed(
+      context,
+      '/relatorios',
+      arguments: tipo,
+    );
+  }
+
+  // Constroi os cards de estatísticas
+  Widget _buildStatCard(
+    String titulo,
+    int valor,
+    IconData icone,
+    String tipoRelatorio,
+  ) {
+    return StatCard(
+      title: titulo,
+      value: _carregando ? '...' : valor.toString(),
+      icon: icone,
+      onTap: () {
+        _abrirRelatorio(tipoRelatorio);
+      },
+    );
+  }
+
+  // Monta as linhas do ranking
+  List<DataRow> _construirLinhasRanking() {
+    return _rankingAlunos.map((aluno) {
+      return DataRow(
+        cells: [
+          DataCell(Text(aluno['nome'])),
+          DataCell(Text(aluno['curso'])),
+          DataCell(Text(aluno['turma'])),
+          DataCell(
+            Text(
+              '${aluno['total']}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      );
+    }).toList();
+  }
+
+  // Monta as linhas das últimas advertências
+  List<DataRow> _construirLinhasAdvertencias() {
+    return _ultimasAdvertencias.map((advertencia) {
+      final aluno = _alunosPorMatricula[
+        advertencia.matriculaAluno
+      ];
+
+      final nomeAluno = aluno?.nome ?? 'Aluno não encontrado';
+
+      final dataFormatada =
+          '${advertencia.data.day.toString().padLeft(2, '0')}/'
+          '${advertencia.data.month.toString().padLeft(2, '0')}/'
+          '${advertencia.data.year}';
+
+      return DataRow(
+        cells: [
+          DataCell(Text(dataFormatada)),
+          DataCell(Text(nomeAluno)),
+          DataCell(Text(aluno?.curso ?? '-')),
+          DataCell(Text(aluno?.turma ?? '-')),
+        ],
+      );
+    }).toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final largura = MediaQuery.of(context).size.width;
+    final bool mobile = largura < 700;
+
     return Scaffold(
-      appBar: const AppbarPrincipal(),
-      drawer:  DrawerTest(),
-      
-      //adicionar avertência botão rápido
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          // Redireciona para a tela de registro de advertência
-          Navigator.pushNamed(context, '/advertencia');
-        },
-        backgroundColor: Theme.of(context).cardColor,
-        icon: const Icon(Icons.add),
-        label: const Text(
-          'Nova Advertência',
-          style: TextStyle( fontWeight: FontWeight.bold),
+      appBar: AppbarPrincipal(),
+      drawer: DrawerTest(),
+
+      floatingActionButton: FloatingActionButton(
+        onPressed: _abrirAdvertencia,
+        backgroundColor: Colors.black,
+        child: const Icon(
+          Icons.add,
+          color: Colors.white,
         ),
       ),
 
-      // tela
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isMobile = constraints.maxWidth < 800;
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. Boas-Vindas
-                Text(
-                  'Olá Edmarcos!',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Bem-vindo ao sistema Adver.',
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.bodySmall?.color,
-                  ),
-                ),
-                const SizedBox(height: 24),
+            const Text(
+              'Visão geral',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
 
-                // 2. StatCards (Empilhados no Mobile, 4 Colunas no Desktop)
-                if (isMobile) ...[
-                  const StatCard(title: 'Total de alunos', value: '489', icon: Icons.groups),
-                  const SizedBox(height: 12),
-                  const StatCard(title: 'Advertências registradas', value: '122', icon: Icons.warning_amber_rounded),
-                  const SizedBox(height: 12),
-                  const StatCard(title: 'Alunos com 3+ advertências', value: '12', icon: Icons.person_outline),
-                  const SizedBox(height: 12),
-                  const StatCard(title: 'Advertências neste mês', value: '21', icon: Icons.calendar_today),
-                ] else
-                  const Row(
-                    children: [
-                      Expanded(child: StatCard(title: 'Total de alunos', value: '489', icon: Icons.groups)),
-                      SizedBox(width: 16),
-                      Expanded(child: StatCard(title: 'Advertências registradas', value: '122', icon: Icons.warning_amber_rounded)),
-                      SizedBox(width: 16),
-                      Expanded(child: StatCard(title: 'Alunos com 3+ advertências', value: '12', icon: Icons.person_outline)),
-                      SizedBox(width: 16),
-                      Expanded(child: StatCard(title: 'Advertências neste mês', value: '21', icon: Icons.calendar_today)),
-                    ],
+            const SizedBox(height: 20),
+
+            // Cards De Estatística
+
+            if (mobile)
+              Column(
+                children: [
+                  _buildStatCard(
+                    'Total de alunos',
+                    _totalAlunos,
+                    Icons.groups,
+                    'total_alunos',
                   ),
 
-                const SizedBox(height: 24),
+                  const SizedBox(height: 12),
 
-                // 3. TABELAS (Agora ocupam 100% da largura!)
-                CustomTableCard(
-                  title: 'Alunos com maior número de advertência',
-                  onTap: () => Navigator.pushNamed(context, '/relatorios', arguments: 'maior_numero'),
-                  columns: const ['Aluno', 'Curso', 'Turma', 'Total de advertências'],
-                  rows: const [
-                    DataRow(cells: [
-                      DataCell(Text('Ana Maria')),
-                      DataCell(Text('Informática')),
-                      DataCell(Text('2º')),
-                      DataCell(Text('8', style: TextStyle(fontWeight: FontWeight.bold))),
-                    ]),
-                    DataRow(cells: [
-                      DataCell(Text('Emylly Lorrany')),
-                      DataCell(Text('Informática')),
-                      DataCell(Text('2º')),
-                      DataCell(Text('6', style: TextStyle(fontWeight: FontWeight.bold))),
-                    ]),
-                  ],
-                ),
+                  _buildStatCard(
+                    'Advertências registradas',
+                    _totalAdvertencias,
+                    Icons.warning_amber_rounded,
+                    'total_advertencias',
+                  ),
 
-                const SizedBox(height: 24),
+                  const SizedBox(height: 12),
 
-                CustomTableCard(
-                  title: 'Últimas advertências registradas',
-                  onTap: () => Navigator.pushNamed(context, '/relatorios', arguments: 'ultimas_advertencias'),
-                  columns: const ['Data', 'Aluno', 'Curso', 'Turma'],
-                  rows: const [
-                    DataRow(cells: [
-                      DataCell(Text('04/09/2026')),
-                      DataCell(Text('João Silva')),
-                      DataCell(Text('Informática')),
-                      DataCell(Text('2º A')),
-                    ]),
-                  ],
-                ),
+                  _buildStatCard(
+                    'Alunos com 3+ advertências',
+                    _alunosComTresOuMais,
+                    Icons.person_outline,
+                    'alunos_3plus',
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildStatCard(
+                    'Advertências neste mês',
+                    _advertenciasNesteMes,
+                    Icons.calendar_today,
+                    'advertencias_mes',
+                  ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard(
+                      'Total de alunos',
+                      _totalAlunos,
+                      Icons.groups,
+                      'total_alunos',
+                    ),
+                  ),
+
+                  const SizedBox(width: 15),
+
+                  Expanded(
+                    child: _buildStatCard(
+                      'Advertências registradas',
+                      _totalAdvertencias,
+                      Icons.warning_amber_rounded,
+                      'total_advertencias',
+                    ),
+                  ),
+
+                  const SizedBox(width: 15),
+
+                  Expanded(
+                    child: _buildStatCard(
+                      'Alunos com 3+ advertências',
+                      _alunosComTresOuMais,
+                      Icons.person_outline,
+                      'alunos_3plus',
+                    ),
+                  ),
+
+                  const SizedBox(width: 15),
+
+                  Expanded(
+                    child: _buildStatCard(
+                      'Advertências neste mês',
+                      _advertenciasNesteMes,
+                      Icons.calendar_today,
+                      'advertencias_mes',
+                    ),
+                  ),
+                ],
+              ),
+
+            const SizedBox(height: 30),
+
+            // RANKING DE ALUNOS
+
+            CustomTableCard(
+              title: 'Alunos com maior número de advertências',
+              columns: const [
+                'Aluno',
+                'Curso',
+                'Turma',
+                'Total',
               ],
-            );
-          },
+              rows: _construirLinhasRanking(),
+              onTap: () {
+                _abrirRelatorio('maior_numero');
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            // últimas advertências
+
+            CustomTableCard(
+              title: 'Últimas advertências registradas',
+              columns: const [
+                'Data',
+                'Aluno',
+                'Curso',
+                'Turma',
+              ],
+              rows: _construirLinhasAdvertencias(),
+              onTap: () {
+                _abrirRelatorio('ultimas_advertencias');
+              },
+            ),
+          ],
         ),
       ),
     );

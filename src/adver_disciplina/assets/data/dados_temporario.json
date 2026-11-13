@@ -1,0 +1,64 @@
+{
+  "alunos": [
+    {
+      "matricula": "202410001",
+      "nome": "Ana Maria",
+      "curso": "Informática",
+      "turma": "2º"
+    },
+    {
+      "matricula": "202410002",
+      "nome": "Emylly Lorrany",
+      "curso": "Informática",
+      "turma": "2º"
+    },
+    {
+      "matricula": "202410003",
+      "nome": "Ana Caroliny",
+      "curso": "Informática",
+      "turma": "2º"
+    },
+    {
+      "matricula": "202410004",
+      "nome": "Fabrício José",
+      "curso": "Informática",
+      "turma": "2º"
+    },
+    {
+      "matricula": "202410005",
+      "nome": "Lívia Campos",
+      "curso": "Informática",
+      "turma": "2º"
+    }
+  ],
+  "advertencias": [
+    {
+      "id": "1",
+      "matricula_aluno": "202410001",
+      "data": "2026-11-10",
+      "justificativa": "Uso de celular em sala sem autorização",
+      "descricao": "Utilizou o celular durante a aula sem autorização."
+    },
+    {
+      "id": "2",
+      "matricula_aluno": "202410002",
+      "data": "2026-11-10",
+      "justificativa": "Uso de celular em sala sem autorização",
+      "descricao": "Utilizou o celular durante a aula sem autorização."
+    },
+    {
+      "id": "3",
+      "matricula_aluno": "202410002",
+      "data": "2026-11-10",
+      "justificativa": "Atraso injustificado",
+      "descricao": "Chegou na aula de Maria Véras depois dela"
+    },
+    {
+      "id": "4",
+      "matricula_aluno": "202410002",
+      "data": "2026-11-10",
+      "justificativa": "Uso de celular em sala sem autorização",
+      "descricao": "Utilizou o celular durante a aula de Maria Véras."
+    }
+  ]
+}
