@@ -8,5 +8,5 @@ Status do projeto
 
 O Adver está em desenvolvimento. Novas funcionalidades e melhorias estão sendo implementadas gradualmente.
 
- 
+  
 
