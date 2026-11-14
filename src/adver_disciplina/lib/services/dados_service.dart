@@ -1,3 +1,4 @@
+import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
@@ -10,7 +11,7 @@ class DadosService {
   DadosService._();
 
   static final DadosService instancia = DadosService._();
-
+  static const String _urlApi = 'http://localhost:3000';
   static const String _chaveAlunos = 'adver_alunos';
   static const String _chaveAdvertencias = 'adver_advertencias';
 
@@ -89,18 +90,25 @@ class DadosService {
     );
   }
 
-  Future<List<Aluno>> listarAlunos() async {
-    await inicializar();
+  
+Future<List<Aluno>> listarAlunos() async {
+  final resposta = await http.get(
+    Uri.parse('$_urlApi/alunos'),
+  );
 
-    final prefs = await SharedPreferences.getInstance();
-
-    final conteudo = prefs.getString(_chaveAlunos) ?? '[]';
-    final List<dynamic> lista = jsonDecode(conteudo);
+  if (resposta.statusCode == 200) {
+    final List<dynamic> lista = jsonDecode(resposta.body);
 
     return lista
         .map((item) => Aluno.fromJson(item))
         .toList();
   }
+
+  throw Exception(
+    'Erro ao buscar alunos: ${resposta.statusCode}',
+  );
+}
+
 
   Future<List<Advertencia>> listarAdvertencias() async {
     await inicializar();

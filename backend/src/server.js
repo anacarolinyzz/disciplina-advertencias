@@ -1,14 +1,19 @@
 
 const express = require('express');
 const cors = require('cors');
+
 require('dotenv').config();
 
 const pool = require('./config/database');
+const alunosRoutes = require('./routes/alunos');
+const importacaoRoutes = require('./routes/importacao');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use('/importacao', importacaoRoutes);
+app.use('/alunos', alunosRoutes);
 
 app.get('/', (req, res) => {
   res.json({
