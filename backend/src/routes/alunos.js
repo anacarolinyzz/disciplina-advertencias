@@ -1,12 +1,12 @@
 
 const express = require('express');
 const router = express.Router();
+const autenticar = require('../middleware/autenticar');
 
 const pool = require('../config/database');
 
-// LISTAR ALUNOS
 // Permite pesquisar, filtrar e contar advertências.
-router.get('/', async (req, res) => {
+router.get('/', autenticar, async (req, res) => {
   try {
     const { busca, curso, turma, status } = req.query;
 
