@@ -1,7 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:excel_plus/excel_plus.dart' hide Border;
+
 
 import 'package:adver/widget/navigation_drawer.dart';
 import 'package:adver/widget/appbar_principal.dart';
@@ -172,9 +172,7 @@ class _AlunosPageState extends State<AlunosPage> {
     });
   }
 
-  // =========================================================
-  // CARREGAMENTO DOS ALUNOS E ADVERTÊNCIAS
-  // =========================================================
+  // carregar alunos e advertencias
 
   Future<void> _carregarAlunos() async {
     try {
@@ -216,90 +214,16 @@ class _AlunosPageState extends State<AlunosPage> {
     }
   }
 
-  // =========================================================
-  // LEITURA E TRATAMENTO DAS CÉLULAS DO EXCEL
-  // =========================================================
+  
+  
 
-  String _obterTextoCelula(dynamic celula) {
-    final valor = celula?.value;
 
-    if (valor == null) {
-      return '';
-    }
+  //importar alunos
 
-    return switch (valor) {
-      TextCellValue() => valor.value.toString(),
-
-      IntCellValue(:final value) =>
-        value.toString(),
-
-      DoubleCellValue(:final value) =>
-        value.toString().replaceAll(RegExp(r'\.0$'), ''),
-
-      BoolCellValue(:final value) =>
-        value.toString(),
-
-      DateCellValue() =>
-        valor.asDateTimeLocal().toString().split(' ').first,
-
-      DateTimeCellValue() =>
-        valor.asDateTimeLocal().toString(),
-
-      TimeCellValue() =>
-        valor.asDuration().toString(),
-
-      FormulaCellValue(:final formula) =>
-        formula,
-
-      CellErrorValue() =>
-        valor.toString(),
-
-      _ => valor.toString(),
-    };
-  }
-
-  // =========================================================
-  // NORMALIZAÇÃO DOS CABEÇALHOS DO EXCEL
-  // =========================================================
-
-  String _normalizarCabecalho(String texto) {
-    return texto
-        .toLowerCase()
-        .trim()
-        .replaceAll('á', 'a')
-        .replaceAll('à', 'a')
-        .replaceAll('ã', 'a')
-        .replaceAll('â', 'a')
-        .replaceAll('é', 'e')
-        .replaceAll('ê', 'e')
-        .replaceAll('í', 'i')
-        .replaceAll('ó', 'o')
-        .replaceAll('ô', 'o')
-        .replaceAll('õ', 'o')
-        .replaceAll('ú', 'u')
-        .replaceAll('ç', 'c')
-        .replaceAll(RegExp(r'[^a-z0-9]'), '');
-  }
-
-  int _encontrarColuna(
-    List<String> cabecalhos,
-    List<String> alternativas,
-  ) {
-    for (int i = 0; i < cabecalhos.length; i++) {
-      if (alternativas.contains(cabecalhos[i])) {
-        return i;
-      }
-    }
-
-    return -1;
-  }
-
-  // =========================================================
-  // IMPORTAÇÃO DO EXCEL
-  // =========================================================
-
+  
   Future<void> _importarAlunos() async {
     try {
+      // Seleciona o arquivo Excel
       final arquivo = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['xlsx'],
@@ -313,148 +237,21 @@ class _AlunosPageState extends State<AlunosPage> {
         _importando = true;
       });
 
+      // Lê o arquivo
       final bytes = await arquivo.readAsBytes();
 
       if (bytes.isEmpty) {
         throw Exception('O arquivo selecionado está vazio.');
       }
 
-      final planilha = Excel.decodeBytes(bytes);
-
-      if (planilha.tables.isEmpty) {
-        throw Exception('A planilha não possui abas.');
-      }
-
-      final nomeAba = planilha.tables.keys.first;
-      final aba = planilha.tables[nomeAba];
-
-      if (aba == null || aba.rows.isEmpty) {
-        throw Exception('A planilha está vazia.');
-      }
-
-      // Identifica as colunas.
-      final cabecalhos = aba.rows.first.map((celula) {
-        return _normalizarCabecalho(
-          _obterTextoCelula(celula),
-        );
-      }).toList();
-
-      final colunaMatricula = _encontrarColuna(
-        cabecalhos,
-        [
-          'matricula',
-          'matriculaaluno',
-          'matriculadoaluno',
-        ],
-      );
-
-      final colunaNome = _encontrarColuna(
-        cabecalhos,
-        [
-          'nome',
-          'nomealuno',
-          'nomedoaluno',
-        ],
-      );
-
-      final colunaCurso = _encontrarColuna(
-        cabecalhos,
-        [
-          'curso',
-          'nomedocurso',
-          'cursodoaluno',
-        ],
-      );
-
-      final colunaTurma = _encontrarColuna(
-        cabecalhos,
-        [
-          'turma',
-          'nometurma',
-          'turmadoaluno',
-        ],
-      );
-
-      if (colunaMatricula == -1 ||
-          colunaNome == -1 ||
-          colunaCurso == -1 ||
-          colunaTurma == -1) {
-        throw Exception(
-          'Não encontrei todas as colunas obrigatórias. '
-          'A planilha precisa ter matrícula, nome, curso e turma.',
-        );
-      }
-
-      // Lê os alunos.
-      final alunosImportados = <Aluno>[];
-      final matriculasEncontradas = <String>{};
-
-      int linhasInvalidas = 0;
-      int linhasDuplicadas = 0;
-
-      for (int i = 1; i < aba.rows.length; i++) {
-        final linha = aba.rows[i];
-
-        String obterValor(int indice) {
-          if (indice >= linha.length) {
-            return '';
-          }
-
-          return _obterTextoCelula(
-            linha[indice],
-          ).trim();
-        }
-
-        final matricula = obterValor(colunaMatricula);
-        final nome = obterValor(colunaNome);
-        final curso = obterValor(colunaCurso);
-        final turma = obterValor(colunaTurma);
-
-        // Ignora linhas totalmente vazias.
-        if (matricula.isEmpty &&
-            nome.isEmpty &&
-            curso.isEmpty &&
-            turma.isEmpty) {
-          continue;
-        }
-
-        // Ignora registros incompletos.
-        if (matricula.isEmpty ||
-            nome.isEmpty ||
-            curso.isEmpty ||
-            turma.isEmpty) {
-          linhasInvalidas++;
-          continue;
-        }
-
-        // Evita matrículas repetidas no arquivo.
-        if (!matriculasEncontradas.add(matricula)) {
-          linhasDuplicadas++;
-          continue;
-        }
-
-        alunosImportados.add(
-          Aluno(
-            matricula: matricula,
-            nome: nome,
-            curso: curso,
-            turma: turma,
-          ),
-        );
-      }
-
-      if (alunosImportados.isEmpty) {
-        throw Exception(
-          'Nenhum aluno válido foi encontrado na planilha.',
-        );
-      }
-
-      // Salva os alunos.
+      // Envia o Excel para o backend
       final resultado =
-          await DadosService.instancia.importarAlunos(
-        alunosImportados,
+          await DadosService.instancia.enviarPlanilhaAlunos(
+        bytes,
+        arquivo.name,
       );
 
+      // Atualiza os alunos vindos do MySQL
       await _carregarAlunos();
 
       if (!mounted) return;
@@ -463,11 +260,10 @@ class _AlunosPageState extends State<AlunosPage> {
         _importando = false;
       });
 
+      // Mostra o resultado
       _mostrarResultadoImportacao(
         novos: resultado['novos'] ?? 0,
         atualizados: resultado['atualizados'] ?? 0,
-        invalidos: linhasInvalidas,
-        duplicados: linhasDuplicadas,
       );
     } catch (e) {
       if (!mounted) return;
@@ -482,9 +278,9 @@ class _AlunosPageState extends State<AlunosPage> {
     }
   }
 
-  // =========================================================
-  // MENSAGENS
-  // =========================================================
+
+  // Mensagens
+  
 
   void _mostrarMensagem(String mensagem) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -495,44 +291,38 @@ class _AlunosPageState extends State<AlunosPage> {
     );
   }
 
-  void _mostrarResultadoImportacao({
-    required int novos,
-    required int atualizados,
-    required int invalidos,
-    required int duplicados,
-  }) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Importação concluída'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Novos alunos: $novos'),
-              const SizedBox(height: 8),
-              Text('Alunos atualizados: $atualizados'),
-              const SizedBox(height: 8),
-              Text('Linhas incompletas ignoradas: $invalidos'),
-              const SizedBox(height: 8),
-              Text('Matrículas repetidas ignoradas: $duplicados'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Fechar'),
-            ),
+  
+void _mostrarResultadoImportacao({
+  required int novos,
+  required int atualizados,
+}) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Importação concluída'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Novos alunos: $novos'),
+            const SizedBox(height: 8),
+            Text('Alunos atualizados: $atualizados'),
           ],
-        );
-      },
-    );
-  }
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fechar'),
+          ),
+        ],
+      );
+    },
+  );
+}
 
-  // =========================================================
-  // CAMPO DE PESQUISA
-  // =========================================================
+
+  // campo pesquisa
 
   Widget _construirPesquisa() {
     return SizedBox(
@@ -557,9 +347,7 @@ class _AlunosPageState extends State<AlunosPage> {
     );
   }
 
-  // =========================================================
-  // FILTRO DE CURSO
-  // =========================================================
+  // filtro curso
 
   Widget _construirFiltroCurso() {
     return SizedBox(
@@ -621,9 +409,7 @@ class _AlunosPageState extends State<AlunosPage> {
     );
   }
 
-  // =========================================================
-  // TABELA DE ALUNOS
-  // =========================================================
+  //tabela aluno
 
   Widget _construirTabela() {
     if (_alunosFiltrados.isEmpty) {

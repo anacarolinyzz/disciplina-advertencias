@@ -1,5 +1,6 @@
-import 'dart:convert';
-
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';  
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,7 +11,7 @@ class DadosService {
   DadosService._();
 
   static final DadosService instancia = DadosService._();
-
+  static const String _urlApi = 'http://localhost:3000';
   static const String _chaveAlunos = 'adver_alunos';
   static const String _chaveAdvertencias = 'adver_advertencias';
 
@@ -89,50 +90,191 @@ class DadosService {
     );
   }
 
-  Future<List<Aluno>> listarAlunos() async {
-    await inicializar();
+  
 
-    final prefs = await SharedPreferences.getInstance();
+Future<List<Aluno>> listarAlunos() async {
+  final headers = await _cabecalhoAutenticado();
 
-    final conteudo = prefs.getString(_chaveAlunos) ?? '[]';
-    final List<dynamic> lista = jsonDecode(conteudo);
+  final resposta = await http.get(
+    Uri.parse('$_urlApi/alunos'),
+    headers: headers,
+  );
 
-    return lista
-        .map((item) => Aluno.fromJson(item))
-        .toList();
+  if (resposta.statusCode == 200) {
+    final List<dynamic> lista = jsonDecode(resposta.body);
+    return lista.map((item) => Aluno.fromJson(item)).toList();
   }
 
-  Future<List<Advertencia>> listarAdvertencias() async {
-    await inicializar();
+  if (resposta.statusCode == 401) {
+    throw Exception('Sua sessão expirou. Faça login novamente.');
+  }
 
+  throw Exception('Erro ao buscar alunos: ${resposta.statusCode}');
+}
+
+
+
+  Future<Map<String, dynamic>> fazerLogin(
+    String login,
+    String senha,
+  ) async {
+    final resposta = await http.post(
+      Uri.parse('$_urlApi/usuarios/login'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'login': login,
+        'senha': senha,
+      }),
+    );
+
+    final Map<String, dynamic> dados = jsonDecode(resposta.body);
+
+    if (resposta.statusCode == 200) {
+      await salvarSessao(
+        token: dados['token'],
+        usuario: dados['usuario'],
+      );
+
+      return dados;
+    }
+
+    throw Exception(
+      dados['erro'] ?? 'Não foi possível realizar o login.',
+    );
+  }
+
+  Future<void> salvarSessao({
+    required String token,
+    required Map<String, dynamic> usuario,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
 
-    final conteudo = prefs.getString(_chaveAdvertencias) ?? '[]';
-    final List<dynamic> lista = jsonDecode(conteudo);
+    await prefs.setString('adver_token', token);
+    await prefs.setString('adver_usuario', jsonEncode(usuario));
+  }
+
+  Future<String?> obterToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('adver_token');
+  }
+
+  Future<Map<String, dynamic>?> obterUsuarioConectado() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final dados = prefs.getString('adver_usuario');
+
+    if (dados == null) {
+      return null;
+    }
+
+    return jsonDecode(dados);
+  }
+
+  Future<void> encerrarSessao() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.remove('adver_token');
+    await prefs.remove('adver_usuario');
+  }
+
+
+
+  
+Future<List<Advertencia>> listarAdvertencias() async {
+  final resposta = await http.get(
+    Uri.parse('$_urlApi/advertencias'),
+    headers: await _cabecalhoAutenticado(),
+  );
+
+  if (resposta.statusCode == 200) {
+    final List<dynamic> lista = jsonDecode(resposta.body);
 
     return lista
         .map((item) => Advertencia.fromJson(item))
         .toList();
   }
 
-  Future<void> salvarAdvertencia(Advertencia advertencia) async {
-    await inicializar();
+  if (resposta.statusCode == 401) {
+    throw Exception('Sua sessão expirou. Faça login novamente.');
+  }
 
-    final prefs = await SharedPreferences.getInstance();
+  throw Exception(
+    'Erro ao buscar advertências: ${resposta.statusCode}',
+  );
+}
 
-    final advertencias = await listarAdvertencias();
 
-    advertencias.add(advertencia);
+  
+Future<void> salvarAdvertencia(Advertencia advertencia) async {
+  final resposta = await http.post(
+    Uri.parse('$_urlApi/advertencias'),
+    headers: await _cabecalhoAutenticado(),
+    body: jsonEncode({
+      'matriculaAluno': advertencia.matriculaAluno,
+      'data': advertencia.data.toIso8601String().split('T').first,
+      'justificativaLegal': advertencia.justificativa,
+      'descricao': advertencia.descricao,
+    }),
+  );
 
-    final listaJson = advertencias
-        .map((item) => item.toJson())
-        .toList();
+  debugPrint('Status da advertência: ${resposta.statusCode}');
+  debugPrint('Resposta da API: ${resposta.body}');
 
-    await prefs.setString(
-      _chaveAdvertencias,
-      jsonEncode(listaJson),
+  if (resposta.statusCode == 201) {
+    return;
+  }
+
+  if (resposta.statusCode == 401) {
+    throw Exception('Sua sessão expirou. Faça login novamente.');
+  }
+
+  final dados = jsonDecode(resposta.body);
+
+  throw Exception(
+    dados['erro'] ?? 'Não foi possível registrar a advertência.',
+  );
+}
+
+
+Future<List<Map<String, dynamic>>> salvarAdvertenciasEmLote({
+  required List<String> matriculas,
+  required DateTime data,
+  required String justificativa,
+  required String descricao,
+}) async {
+  final resposta = await http.post(
+    Uri.parse('$_urlApi/advertencias/lote'),
+    headers: await _cabecalhoAutenticado(),
+    body: jsonEncode({
+      'matriculas': matriculas,
+      'data': data.toIso8601String().split('T').first,
+      'justificativaLegal': justificativa,
+      'descricao': descricao,
+    }),
+  );
+
+  debugPrint('Status do lote: ${resposta.statusCode}');
+  debugPrint('Resposta do lote: ${resposta.body}');
+
+  final dados = jsonDecode(resposta.body);
+
+  if (resposta.statusCode == 201) {
+    return List<Map<String, dynamic>>.from(
+      dados['advertencias'],
     );
   }
+
+  if (resposta.statusCode == 401) {
+    throw Exception('Sua sessão expirou. Faça login novamente.');
+  }
+
+  throw Exception(
+    dados['erro'] ?? 'Não foi possível registrar as advertências.',
+  );
+}
+
 
 
   Future<void> atualizarAlunosDoJson() async {
@@ -151,6 +293,54 @@ class DadosService {
     jsonEncode(alunos),
   );
 }
+Future<Map<String, dynamic>> enviarPlanilhaAlunos(
+  Uint8List bytes,
+  String nomeArquivo,
+) async {
+  final request = http.MultipartRequest(
+    'POST',
+    Uri.parse('$_urlApi/importacao/alunos'),
+    
+  );
+  request.headers['Authorization'] =
+    'Bearer ${await obterToken()}';
+
+  request.files.add(
+    http.MultipartFile.fromBytes(
+      'arquivo',
+      bytes,
+      filename: nomeArquivo,
+    ),
+  );
+
+  final resposta = await request.send();
+  final corpo = await resposta.stream.bytesToString();
+
+  final Map<String, dynamic> dados = jsonDecode(corpo);
+
+  if (resposta.statusCode >= 200 && resposta.statusCode < 300) {
+    return dados;
+  }
+
+  throw Exception(
+    dados['erro'] ??
+        dados['mensagem'] ??
+        'Falha ao importar a planilha.',
+  );
+}
   
+Future<Map<String, String>> _cabecalhoAutenticado() async {
+  final token = await obterToken();
+
+  if (token == null || token.isEmpty) {
+    throw Exception('Sessão não encontrada. Faça login novamente.');
+  }
+
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer $token',
+  };
+}
+
 
 }

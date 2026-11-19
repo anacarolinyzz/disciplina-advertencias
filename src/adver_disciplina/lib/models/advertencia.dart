@@ -1,3 +1,4 @@
+
 class Advertencia {
   final String id;
   final String matriculaAluno;
@@ -15,20 +16,26 @@ class Advertencia {
 
   factory Advertencia.fromJson(Map<String, dynamic> json) {
     return Advertencia(
-      id: json['id'].toString(),
-      matriculaAluno: json['matricula_aluno'].toString(),
-      data: DateTime.parse(json['data'].toString()),
-      justificativa: json['justificativa'].toString(),
-      descricao: json['descricao'].toString(),
+      id: (json['idAdvertencia'] ?? json['id'] ?? '').toString(),
+      matriculaAluno:
+          (json['matriculaAluno'] ?? json['matricula_aluno'] ?? '')
+              .toString(),
+      data: DateTime.parse(
+        (json['data_advertencia'] ?? json['data']).toString(),
+      ),
+      justificativa:
+          (json['justificativaLegal'] ?? json['justificativa'] ?? '')
+              .toString(),
+      descricao: (json['descricao'] ?? '').toString(),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
-      'matricula_aluno': matriculaAluno,
-      'data': data.toIso8601String().split('T').first,
-      'justificativa': justificativa,
+      'idAdvertencia': id,
+      'matriculaAluno': matriculaAluno,
+      'data_advertencia': data.toIso8601String().split('T').first,
+      'justificativaLegal': justificativa,
       'descricao': descricao,
     };
   }

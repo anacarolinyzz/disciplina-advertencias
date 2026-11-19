@@ -289,6 +289,7 @@ class _RelatorioPageState extends State<RelatorioPage> {
 
   Future<void> _gerarPdf() async {
     final advertencias = _advertenciasParaRelatorio();
+    
 
     if (advertencias.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

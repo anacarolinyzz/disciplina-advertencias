@@ -6,11 +6,11 @@ typedef AlunoMap = Map<String, String>;
 class SecaoAluno extends StatelessWidget {
   final bool emLote;
   final String? alunoNome;
-  final List<String> alunosEmLote;
+  final List<AlunoMap> alunosEmLote;
   final List<AlunoMap> listaAlunosCadastrados;
   final Function(AlunoMap) onAlunoSelecionado;
   final Function(String) onRemoverAlunoLote;
-  
+
   const SecaoAluno({
     super.key,
     required this.emLote,
@@ -41,121 +41,128 @@ class SecaoAluno extends StatelessWidget {
         const SizedBox(height: 16),
 
         LayoutBuilder(
-          builder: (context, constraints) {
-            return Autocomplete<AlunoMap>(
-              displayStringForOption: (option) =>
-                  option['nome'] ?? '',
+  builder: (context, constraints) {
+    TextEditingController? controladorBusca;
+    FocusNode? focoBusca;
 
-              optionsBuilder: (TextEditingValue value) {
-                final pesquisa = value.text.trim().toLowerCase();
+    return Autocomplete<AlunoMap>(
+      displayStringForOption: (option) =>
+          option['nome'] ?? '',
 
-                if (pesquisa.isEmpty) {
-                  return const Iterable<AlunoMap>.empty();
-                }
+      optionsBuilder: (TextEditingValue value) {
+        final pesquisa = value.text.trim().toLowerCase();
 
-                return listaAlunosCadastrados.where((aluno) {
-                  final nome =
-                      (aluno['nome'] ?? '').toLowerCase();
+        if (pesquisa.isEmpty) {
+          return const Iterable<AlunoMap>.empty();
+        }
 
-                  final matricula =
-                      (aluno['matricula'] ?? '').toLowerCase();
+        return listaAlunosCadastrados.where((aluno) {
+          final nome = (aluno['nome'] ?? '').toLowerCase();
+          final matricula =
+              (aluno['matricula'] ?? '').toLowerCase();
 
-                  return nome.contains(pesquisa) ||
-                      matricula.contains(pesquisa);
-                });
-              },
+          return nome.contains(pesquisa) ||
+              matricula.contains(pesquisa);
+        });
+      },
 
-              onSelected: (AlunoMap selecao) {
-                onAlunoSelecionado(selecao);
-              },
+      onSelected: (AlunoMap selecao) {
+        onAlunoSelecionado(selecao);
 
-              fieldViewBuilder: (
-                context,
-                controller,
-                focusNode,
-                onEditingComplete,
-              ) {
-                return TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  onEditingComplete: onEditingComplete,
-                  decoration: InputDecoration(
-                    hintText: emLote
-                        ? 'Digite para buscar e adicionar alunos ao lote...'
-                        : 'Digite o nome ou matrícula do aluno...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                  ),
-                );
-              },
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          controladorBusca?.clear();
+          focoBusca?.unfocus();
+        });
+      },
 
-              optionsViewBuilder: (
-                context,
-                onSelected,
-                options,
-              ) {
-                return Align(
-                  alignment: Alignment.topLeft,
-                  child: Material(
-                    elevation: 8,
-                    color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      width: constraints.maxWidth,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Colors.grey.withValues(alpha: 0.5),
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+      fieldViewBuilder: (
+        context,
+        controller,
+        focusNode,
+        onEditingComplete,
+      ) {
+        controladorBusca = controller;
+        focoBusca = focusNode;
 
-                      // CORREÇÃO: limita a altura da lista
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxHeight: 250,
-                        ),
-                        child: ListView.builder(
-                          padding: EdgeInsets.zero,
-                          shrinkWrap: true,
-                          itemCount: options.length,
-                          itemBuilder: (context, index) {
-                            final option =
-                                options.elementAt(index);
-
-                            return ListTile(
-                              leading: const Icon(
-                                Icons.person_outline,
-                              ),
-                              title: Text(
-                                option['nome'] ?? '',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle: Text(
-                                'Turma: ${option['turma']} | '
-                                'Matrícula: ${option['matricula']}',
-                              ),
-                              onTap: () {
-                                onSelected(option);
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
+        return TextField(
+          controller: controller,
+          focusNode: focusNode,
+          onEditingComplete: onEditingComplete,
+          decoration: InputDecoration(
+            hintText: emLote
+                ? 'Digite para buscar e adicionar alunos ao lote...'
+                : 'Digite o nome ou matrícula do aluno...',
+            prefixIcon: const Icon(Icons.search),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+          ),
+          onTapOutside: (_) {
+            focusNode.unfocus();
           },
-        ),
+        );
+      },
+
+      optionsViewBuilder: (
+        context,
+        onSelected,
+        options,
+      ) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 8,
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: constraints.maxWidth,
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Colors.grey.withValues(alpha: 0.5),
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxHeight: 250,
+                ),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (context, index) {
+                    final option = options.elementAt(index);
+
+                    return ListTile(
+                      leading: const Icon(Icons.person_outline),
+                      title: Text(
+                        option['nome'] ?? '',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Turma: ${option['turma']} | '
+                        'Matrícula: ${option['matricula']}',
+                      ),
+                      onTap: () {
+                        onSelected(option);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  },
+),
 
         const SizedBox(height: 16),
 
@@ -198,12 +205,14 @@ class SecaoAluno extends StatelessWidget {
             runSpacing: 4,
             children: alunosEmLote.map((aluno) {
               return Chip(
-                label: Text(aluno),
+                label: Text(aluno['nome'] ?? ''),
                 deleteIcon: const Icon(
                   Icons.close,
                   size: 18,
                 ),
-                onDeleted: () => onRemoverAlunoLote(aluno),
+                onDeleted: () {
+                  onRemoverAlunoLote(aluno['matricula']!);
+                },
               );
             }).toList(),
           ),

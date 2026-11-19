@@ -7,6 +7,9 @@ import 'package:adver/widget/navigation_drawer.dart';
 import 'package:adver/widget/advertencia/modo_header.dart';
 import 'package:adver/widget/advertencia/secao_aluno.dart';
 import 'package:adver/widget/advertencia/secao_dados_advertencia.dart';
+import 'package:adver/models/advertencia.dart';
+import 'package:adver/services/pdf_service.dart';
+import 'package:adver/services/zip_service.dart';
 
 
 
@@ -45,10 +48,11 @@ class _AdvertenciaPageState extends State<AdvertenciaPage> {
   String _alunoCurso = "Selecione o aluno";
   String _alunoTurma = "Selecione o aluno";
   String _alunoMatricula = "Selecione o aluno";
+  bool _salvando = false;
 
   
   List<AlunoMap> _alunosCadastrados = [];
-  final List<String> _alunosEmLote = [];
+  final List<AlunoMap> _alunosEmLote = [];
 
   @override
   void initState() {
@@ -83,19 +87,25 @@ Future<void> _carregarAlunosDoJson() async {
 
 
   void _selecionarAluno(AlunoMap aluno) {
-    setState(() {
-      if (_emLote) {
-        if (!_alunosEmLote.contains(aluno['nome'])) {
-          _alunosEmLote.add(aluno['nome']!);
-        }
-      } else {
-        _alunoNome = aluno['nome'];
-        _alunoCurso = aluno['curso']!;
-        _alunoTurma = aluno['turma']!;
-        _alunoMatricula = aluno['matricula']!;
+  setState(() {
+    if (_emLote) {
+      final matricula = aluno['matricula'];
+
+      final jaSelecionado = _alunosEmLote.any(
+        (item) => item['matricula'] == matricula,
+      );
+
+      if (!jaSelecionado) {
+        _alunosEmLote.add(aluno);
       }
-    });
-  }
+    } else {
+      _alunoNome = aluno['nome'];
+      _alunoCurso = aluno['curso']!;
+      _alunoTurma = aluno['turma']!;
+      _alunoMatricula = aluno['matricula']!;
+    }
+  });
+}
 
   @override
   Widget build(BuildContext context) {
@@ -125,9 +135,13 @@ Future<void> _carregarAlunosDoJson() async {
                       alunosEmLote: _alunosEmLote,
                       listaAlunosCadastrados: _alunosCadastrados,
                       onAlunoSelecionado: _selecionarAluno,
-                      onRemoverAlunoLote: (aluno) {
-                        setState(() => _alunosEmLote.remove(aluno));
-                      },
+                      onRemoverAlunoLote: (matricula) {
+                         setState(() {
+                          _alunosEmLote.removeWhere(
+                          (aluno) => aluno['matricula'] == matricula,
+                        );
+                     });
+                    },
                     ),
                     const SizedBox(height: 24),
                     const Divider(),
@@ -159,14 +173,20 @@ Future<void> _carregarAlunosDoJson() async {
                   child: const Text('Cancelar'),
                 ),
                 ElevatedButton.icon(
-                  onPressed: _salvarEGerarPDF,
+                  onPressed: _salvando ? null : _salvarEGerarPDF,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFD32F2F),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   ),
                   icon: const Icon(Icons.print),
-                  label: Text(_emLote ? 'Salvar e Gerar PDFs (${_alunosEmLote.length})' : 'Salvar e Gerar PDF'),
+                  label: Text(
+  _salvando
+      ? 'Salvando...'
+      : _emLote
+          ? 'Salvar e Gerar PDFs (${_alunosEmLote.length})'
+          : 'Salvar e Gerar PDF',
+),
                 ),
               ],
             ),
@@ -176,23 +196,329 @@ Future<void> _carregarAlunosDoJson() async {
     );
   }
 
-  void _salvarEGerarPDF() {
+
+
+
+Future<void> _salvarAdvertenciasEmLote() async {
+  if (_salvando) return;
+
+  if (_alunosEmLote.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Selecione pelo menos um aluno.'),
+      ),
+    );
+    return;
+  }
+
+  if (_justificativaSelecionada == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Selecione uma justificativa.'),
+      ),
+    );
+    return;
+  }
+
+  if (_descricaoController.text.trim().isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Preencha a descrição.'),
+      ),
+    );
+    return;
+  }
+
+  DateTime data;
+
+  try {
+    final partes = _dataController.text.split('/');
+
+    if (partes.length != 3) {
+      throw FormatException();
+    }
+
+    data = DateTime(
+      int.parse(partes[2]),
+      int.parse(partes[1]),
+      int.parse(partes[0]),
+    );
+
+    if (data.day != int.parse(partes[0]) ||
+        data.month != int.parse(partes[1]) ||
+        data.year != int.parse(partes[2])) {
+      throw FormatException();
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Informe uma data válida.'),
+      ),
+    );
+    return;
+  }
+
+  // Guardar os dados antes de iniciar o processo.
+  final alunosSelecionados = List<AlunoMap>.from(_alunosEmLote);
+
+  final matriculas = alunosSelecionados
+      .map((aluno) => aluno['matricula']!)
+      .toList();
+
+  final justificativa = _justificativaSelecionada!;
+  final descricao = _descricaoController.text.trim();
+
+  setState(() {
+    _salvando = true;
+  });
+
+  try {
+    // 1. Registrar todas as advertências no banco de dados.
+    final registros =
+        await DadosService.instancia.salvarAdvertenciasEmLote(
+      matriculas: matriculas,
+      data: data,
+      justificativa: justificativa,
+      descricao: descricao,
+    );
+
+    // 2. Gerar os PDFs e baixar um único arquivo ZIP.
+    List<String> pdfsComErro;
+
+    try {
+      pdfsComErro = await ZipService.gerarEbaixarAdvertencias(
+        alunos: alunosSelecionados,
+        data: data,
+        justificativa: justificativa,
+        descricao: descricao,
+      );
+    } catch (erroZip) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${registros.length} advertência(s) foram salvas, '
+            'mas houve um erro ao gerar ou baixar o ZIP: $erroZip',
+          ),
+          duration: const Duration(seconds: 8),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    // 3. Apresentar o resultado.
+    final quantidadeSalva = registros.length;
+    final quantidadePdf =
+        alunosSelecionados.length - pdfsComErro.length;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Advertência Salva!'),
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Processo concluído!'),
         content: Text(
-          _emLote
-              ? 'As advertências do lote foram registradas com sucesso.'
-              : 'Advertência de ${_alunoNome ?? "Aluno"} salva com sucesso.',
+          pdfsComErro.isEmpty
+              ? '$quantidadeSalva advertência(s) foram registradas '
+                  'e $quantidadePdf PDF(s) foram incluídos no ZIP. '
+                  'O download foi iniciado.'
+              : '$quantidadeSalva advertência(s) foram registradas. '
+                  '$quantidadePdf PDF(s) foram incluídos no ZIP e o '
+                  'download foi iniciado. Não foi possível gerar os '
+                  'PDFs de: ${pdfsComErro.join(', ')}.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _limparFormulario();
+            },
             child: const Text('Fechar'),
           ),
         ],
       ),
     );
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Erro ao registrar advertências: $e'),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        _salvando = false;
+      });
+    }
   }
+}
+
+
+
+
+  
+Future<void> _salvarEGerarPDF() async {
+  if (_emLote) {
+    await _salvarAdvertenciasEmLote();
+    return;
+  }
+
+  if (_salvando) return;
+
+  // Validações
+  if (_alunoNome == null ||
+      _alunoMatricula == 'Selecione o aluno') {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Selecione um aluno.')),
+    );
+    return;
+  }
+
+  if (_justificativaSelecionada == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Selecione uma justificativa.')),
+    );
+    return;
+  }
+
+  if (_descricaoController.text.trim().isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Preencha a descrição.')),
+    );
+    return;
+  }
+
+  // Converter data
+  DateTime data;
+
+  try {
+    final partes = _dataController.text.split('/');
+
+    if (partes.length != 3) {
+      throw FormatException();
+    }
+
+    data = DateTime(
+      int.parse(partes[2]),
+      int.parse(partes[1]),
+      int.parse(partes[0]),
+    );
+
+    if (data.day != int.parse(partes[0]) ||
+        data.month != int.parse(partes[1]) ||
+        data.year != int.parse(partes[2])) {
+      throw FormatException();
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Informe uma data válida.')),
+    );
+    return;
+  }
+
+  setState(() {
+    _salvando = true;
+  });
+
+  try {
+    final advertencia = Advertencia(
+      id: '',
+      matriculaAluno: _alunoMatricula,
+      data: data,
+      justificativa: _justificativaSelecionada!,
+      descricao: _descricaoController.text.trim(),
+    );
+
+    // 1. Salvar no banco de dados
+    await DadosService.instancia.salvarAdvertencia(advertencia);
+
+    // 2. Recuperar funcionário conectado
+    final usuario =
+        await DadosService.instancia.obterUsuarioConectado();
+
+    final funcionarioNome =
+        usuario?['nome']?.toString() ?? 'Não identificado';
+
+    // 3. Gerar PDF
+    try {
+      await PdfService.gerarPdfAdvertencia(
+        alunoNome: _alunoNome!,
+        matricula: _alunoMatricula,
+        curso: _alunoCurso,
+        turma: _alunoTurma,
+        data: data,
+        justificativa: _justificativaSelecionada!,
+        descricao: _descricaoController.text.trim(),
+        funcionarioNome: funcionarioNome,
+      );
+    } catch (erroPdf) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Advertência salva, mas houve um erro ao gerar o PDF: $erroPdf',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Advertência registrada!'),
+        content: Text(
+          'A advertência de $_alunoNome foi salva no banco de dados e o PDF foi gerado.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _limparFormulario();
+            },
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Erro ao registrar advertência: $e'),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        _salvando = false;
+      });
+    }
+  }
+}
+
+  void _limparFormulario() {
+  setState(() {
+    _alunoNome = null;
+    _alunoCurso = 'Selecione o aluno';
+    _alunoTurma = 'Selecione o aluno';
+    _alunoMatricula = 'Selecione o aluno';
+
+    _alunosEmLote.clear();
+    _justificativaSelecionada = null;
+
+    _dataController.text =
+        "${DateTime.now().day.toString().padLeft(2, '0')}/${DateTime.now().month.toString().padLeft(2, '0')}/${DateTime.now().year}";
+
+    _descricaoController.clear();
+  });
+}
 }
