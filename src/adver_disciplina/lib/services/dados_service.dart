@@ -1,7 +1,10 @@
+
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';  
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/aluno.dart';
@@ -11,62 +14,24 @@ class DadosService {
   DadosService._();
 
   static final DadosService instancia = DadosService._();
+
   static const String _urlApi = 'http://localhost:3000';
   static const String _chaveAlunos = 'adver_alunos';
   static const String _chaveAdvertencias = 'adver_advertencias';
 
   Future<void>? _inicializacao;
 
+  // --------------------------------------------------
+  // INICIALIZAÇÃO DOS DADOS LOCAIS
+  // --------------------------------------------------
+
   Future<void> inicializar() {
     return _inicializacao ??= _carregarDadosIniciais();
   }
-  
-  Future<Map<String, int>> importarAlunos(
-  List<Aluno> novosAlunos,
-) async {
-  await inicializar();
 
-  final prefs = await SharedPreferences.getInstance();
-  final alunosExistentes = await listarAlunos();
-
-  final Map<String, Aluno> mapaAlunos = {
-    for (final aluno in alunosExistentes)
-      aluno.matricula: aluno,
-  };
-
-  int novos = 0;
-  int atualizados = 0;
-
-  for (final aluno in novosAlunos) {
-    if (mapaAlunos.containsKey(aluno.matricula)) {
-      atualizados++;
-    } else {
-      novos++;
-    }
-
-    mapaAlunos[aluno.matricula] = aluno;
-  }
-
-  final listaJson = mapaAlunos.values
-      .map((aluno) => aluno.toJson())
-      .toList();
-
-  await prefs.setString(
-    _chaveAlunos,
-    jsonEncode(listaJson),
-  );
-
-  return {
-    'novos': novos,
-    'atualizados': atualizados,
-    'total': novosAlunos.length,
-  };
-}
   Future<void> _carregarDadosIniciais() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // Se os dados já existem no navegador, não carregamos
-    // novamente o JSON por cima deles.
     final alunosExistem = prefs.containsKey(_chaveAlunos);
     final advertenciasExistem = prefs.containsKey(_chaveAdvertencias);
 
@@ -90,29 +55,9 @@ class DadosService {
     );
   }
 
-  
-
-Future<List<Aluno>> listarAlunos() async {
-  final headers = await _cabecalhoAutenticado();
-
-  final resposta = await http.get(
-    Uri.parse('$_urlApi/alunos'),
-    headers: headers,
-  );
-
-  if (resposta.statusCode == 200) {
-    final List<dynamic> lista = jsonDecode(resposta.body);
-    return lista.map((item) => Aluno.fromJson(item)).toList();
-  }
-
-  if (resposta.statusCode == 401) {
-    throw Exception('Sua sessão expirou. Faça login novamente.');
-  }
-
-  throw Exception('Erro ao buscar alunos: ${resposta.statusCode}');
-}
-
-
+  // --------------------------------------------------
+  // AUTENTICAÇÃO E SESSÃO
+  // --------------------------------------------------
 
   Future<Map<String, dynamic>> fazerLogin(
     String login,
@@ -134,7 +79,7 @@ Future<List<Aluno>> listarAlunos() async {
     if (resposta.statusCode == 200) {
       await salvarSessao(
         token: dados['token'],
-        usuario: dados['usuario'],
+        usuario: Map<String, dynamic>.from(dados['usuario']),
       );
 
       return dados;
@@ -169,7 +114,7 @@ Future<List<Aluno>> listarAlunos() async {
       return null;
     }
 
-    return jsonDecode(dados);
+    return Map<String, dynamic>.from(jsonDecode(dados));
   }
 
   Future<void> encerrarSessao() async {
@@ -179,168 +124,245 @@ Future<List<Aluno>> listarAlunos() async {
     await prefs.remove('adver_usuario');
   }
 
+  Future<Map<String, String>> _cabecalhoAutenticado() async {
+    final token = await obterToken();
 
+    if (token == null || token.isEmpty) {
+      throw Exception('Sessão não encontrada. Faça login novamente.');
+    }
 
-  
-Future<List<Advertencia>> listarAdvertencias() async {
-  final resposta = await http.get(
-    Uri.parse('$_urlApi/advertencias'),
-    headers: await _cabecalhoAutenticado(),
-  );
-
-  if (resposta.statusCode == 200) {
-    final List<dynamic> lista = jsonDecode(resposta.body);
-
-    return lista
-        .map((item) => Advertencia.fromJson(item))
-        .toList();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
   }
 
-  if (resposta.statusCode == 401) {
-    throw Exception('Sua sessão expirou. Faça login novamente.');
-  }
+  // --------------------------------------------------
+  // ALUNOS
+  // --------------------------------------------------
 
-  throw Exception(
-    'Erro ao buscar advertências: ${resposta.statusCode}',
-  );
-}
+  Future<List<Aluno>> listarAlunos() async {
+    final resposta = await http.get(
+      Uri.parse('$_urlApi/alunos'),
+      headers: await _cabecalhoAutenticado(),
+    );
 
+    if (resposta.statusCode == 200) {
+      final List<dynamic> lista = jsonDecode(resposta.body);
 
-  
-Future<void> salvarAdvertencia(Advertencia advertencia) async {
-  final resposta = await http.post(
-    Uri.parse('$_urlApi/advertencias'),
-    headers: await _cabecalhoAutenticado(),
-    body: jsonEncode({
-      'matriculaAluno': advertencia.matriculaAluno,
-      'data': advertencia.data.toIso8601String().split('T').first,
-      'justificativaLegal': advertencia.justificativa,
-      'descricao': advertencia.descricao,
-    }),
-  );
+      return lista
+          .map((item) => Aluno.fromJson(item))
+          .toList();
+    }
 
-  debugPrint('Status da advertência: ${resposta.statusCode}');
-  debugPrint('Resposta da API: ${resposta.body}');
+    if (resposta.statusCode == 401) {
+      throw Exception('Sua sessão expirou. Faça login novamente.');
+    }
 
-  if (resposta.statusCode == 201) {
-    return;
-  }
-
-  if (resposta.statusCode == 401) {
-    throw Exception('Sua sessão expirou. Faça login novamente.');
-  }
-
-  final dados = jsonDecode(resposta.body);
-
-  throw Exception(
-    dados['erro'] ?? 'Não foi possível registrar a advertência.',
-  );
-}
-
-
-Future<List<Map<String, dynamic>>> salvarAdvertenciasEmLote({
-  required List<String> matriculas,
-  required DateTime data,
-  required String justificativa,
-  required String descricao,
-}) async {
-  final resposta = await http.post(
-    Uri.parse('$_urlApi/advertencias/lote'),
-    headers: await _cabecalhoAutenticado(),
-    body: jsonEncode({
-      'matriculas': matriculas,
-      'data': data.toIso8601String().split('T').first,
-      'justificativaLegal': justificativa,
-      'descricao': descricao,
-    }),
-  );
-
-  debugPrint('Status do lote: ${resposta.statusCode}');
-  debugPrint('Resposta do lote: ${resposta.body}');
-
-  final dados = jsonDecode(resposta.body);
-
-  if (resposta.statusCode == 201) {
-    return List<Map<String, dynamic>>.from(
-      dados['advertencias'],
+    throw Exception(
+      'Erro ao buscar alunos: ${resposta.statusCode}',
     );
   }
 
-  if (resposta.statusCode == 401) {
-    throw Exception('Sua sessão expirou. Faça login novamente.');
+  Future<Map<String, dynamic>> enviarPlanilhaAlunos(
+    Uint8List bytes,
+    String nomeArquivo,
+  ) async {
+    final token = await obterToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Sessão não encontrada. Faça login novamente.');
+    }
+
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$_urlApi/importacao/alunos'),
+    );
+
+    request.headers['Authorization'] = 'Bearer $token';
+
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'arquivo',
+        bytes,
+        filename: nomeArquivo,
+      ),
+    );
+
+    final resposta = await request.send();
+    final corpo = await resposta.stream.bytesToString();
+
+    final Map<String, dynamic> dados = jsonDecode(corpo);
+
+    if (resposta.statusCode >= 200 &&
+        resposta.statusCode < 300) {
+      return dados;
+    }
+
+    if (resposta.statusCode == 401) {
+      throw Exception('Sua sessão expirou. Faça login novamente.');
+    }
+
+    throw Exception(
+      dados['erro'] ??
+          dados['mensagem'] ??
+          'Falha ao importar a planilha.',
+    );
   }
 
-  throw Exception(
-    dados['erro'] ?? 'Não foi possível registrar as advertências.',
-  );
-}
+  // Método mantido para compatibilidade com funcionalidades antigas.
+  // A importação oficial de alunos é feita pela API.
+  Future<Map<String, int>> importarAlunos(
+    List<Aluno> novosAlunos,
+  ) async {
+    await inicializar();
 
+    final prefs = await SharedPreferences.getInstance();
+    final alunosExistentes = await listarAlunos();
 
+    final Map<String, Aluno> mapaAlunos = {
+      for (final aluno in alunosExistentes)
+        aluno.matricula: aluno,
+    };
+
+    int novos = 0;
+    int atualizados = 0;
+
+    for (final aluno in novosAlunos) {
+      if (mapaAlunos.containsKey(aluno.matricula)) {
+        atualizados++;
+      } else {
+        novos++;
+      }
+
+      mapaAlunos[aluno.matricula] = aluno;
+    }
+
+    final listaJson = mapaAlunos.values
+        .map((aluno) => aluno.toJson())
+        .toList();
+
+    await prefs.setString(
+      _chaveAlunos,
+      jsonEncode(listaJson),
+    );
+
+    return {
+      'novos': novos,
+      'atualizados': atualizados,
+      'total': novosAlunos.length,
+    };
+  }
 
   Future<void> atualizarAlunosDoJson() async {
-  final prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
 
-  final conteudo = await rootBundle.loadString(
-    'assets/data/dados_temporario.json',
-  );
+    final conteudo = await rootBundle.loadString(
+      'assets/data/dados_temporario.json',
+    );
 
-  final Map<String, dynamic> dados = jsonDecode(conteudo);
+    final Map<String, dynamic> dados = jsonDecode(conteudo);
+    final alunos = dados['alunos'] ?? [];
 
-  final alunos = dados['alunos'] ?? [];
-
-  await prefs.setString(
-    _chaveAlunos,
-    jsonEncode(alunos),
-  );
-}
-Future<Map<String, dynamic>> enviarPlanilhaAlunos(
-  Uint8List bytes,
-  String nomeArquivo,
-) async {
-  final request = http.MultipartRequest(
-    'POST',
-    Uri.parse('$_urlApi/importacao/alunos'),
-    
-  );
-  request.headers['Authorization'] =
-    'Bearer ${await obterToken()}';
-
-  request.files.add(
-    http.MultipartFile.fromBytes(
-      'arquivo',
-      bytes,
-      filename: nomeArquivo,
-    ),
-  );
-
-  final resposta = await request.send();
-  final corpo = await resposta.stream.bytesToString();
-
-  final Map<String, dynamic> dados = jsonDecode(corpo);
-
-  if (resposta.statusCode >= 200 && resposta.statusCode < 300) {
-    return dados;
+    await prefs.setString(
+      _chaveAlunos,
+      jsonEncode(alunos),
+    );
   }
 
-  throw Exception(
-    dados['erro'] ??
-        dados['mensagem'] ??
-        'Falha ao importar a planilha.',
-  );
-}
-  
-Future<Map<String, String>> _cabecalhoAutenticado() async {
-  final token = await obterToken();
+  // --------------------------------------------------
+  // ADVERTÊNCIAS
+  // --------------------------------------------------
 
-  if (token == null || token.isEmpty) {
-    throw Exception('Sessão não encontrada. Faça login novamente.');
+  Future<List<Advertencia>> listarAdvertencias() async {
+    final resposta = await http.get(
+      Uri.parse('$_urlApi/advertencias'),
+      headers: await _cabecalhoAutenticado(),
+    );
+
+    if (resposta.statusCode == 200) {
+      final List<dynamic> lista = jsonDecode(resposta.body);
+
+      return lista
+          .map((item) => Advertencia.fromJson(item))
+          .toList();
+    }
+
+    if (resposta.statusCode == 401) {
+      throw Exception('Sua sessão expirou. Faça login novamente.');
+    }
+
+    throw Exception(
+      'Erro ao buscar advertências: ${resposta.statusCode}',
+    );
   }
 
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer $token',
-  };
-}
+  Future<void> salvarAdvertencia(
+    Advertencia advertencia,
+  ) async {
+    final resposta = await http.post(
+      Uri.parse('$_urlApi/advertencias'),
+      headers: await _cabecalhoAutenticado(),
+      body: jsonEncode({
+        'matriculaAluno': advertencia.matriculaAluno,
+        'data': advertencia.data.toIso8601String().split('T').first,
+        'justificativaLegal': advertencia.justificativa,
+        'descricao': advertencia.descricao,
+      }),
+    );
 
+    debugPrint('Status da advertência: ${resposta.statusCode}');
+    debugPrint('Resposta da API: ${resposta.body}');
 
+    if (resposta.statusCode == 201) {
+      return;
+    }
+
+    if (resposta.statusCode == 401) {
+      throw Exception('Sua sessão expirou. Faça login novamente.');
+    }
+
+    final dados = jsonDecode(resposta.body);
+
+    throw Exception(
+      dados['erro'] ?? 'Não foi possível registrar a advertência.',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> salvarAdvertenciasEmLote({
+    required List<String> matriculas,
+    required DateTime data,
+    required String justificativa,
+    required String descricao,
+  }) async {
+    final resposta = await http.post(
+      Uri.parse('$_urlApi/advertencias/lote'),
+      headers: await _cabecalhoAutenticado(),
+      body: jsonEncode({
+        'matriculas': matriculas,
+        'data': data.toIso8601String().split('T').first,
+        'justificativaLegal': justificativa,
+        'descricao': descricao,
+      }),
+    );
+
+    debugPrint('Status do lote: ${resposta.statusCode}');
+    debugPrint('Resposta do lote: ${resposta.body}');
+
+    final dados = jsonDecode(resposta.body);
+
+    if (resposta.statusCode == 201) {
+      return List<Map<String, dynamic>>.from(
+        dados['advertencias'],
+      );
+    }
+
+    if (resposta.statusCode == 401) {
+      throw Exception('Sua sessão expirou. Faça login novamente.');
+    }
+
+    throw Exception(
+      dados['erro'] ?? 'Não foi possível registrar as advertências.',
+    );
+  }
 }

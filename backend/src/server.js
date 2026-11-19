@@ -5,16 +5,17 @@ const cors = require('cors');
 require('dotenv').config();
 
 const pool = require('./config/database');
+
 const alunosRoutes = require('./routes/alunos');
 const importacaoRoutes = require('./routes/importacao');
 const usuariosRoutes = require('./routes/usuarios');
 const advertenciasRoutes = require('./routes/advertencias');
 
-
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
 app.use('/importacao', importacaoRoutes);
 app.use('/alunos', alunosRoutes);
 app.use('/usuarios', usuariosRoutes);

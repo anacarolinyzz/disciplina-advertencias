@@ -121,3 +121,4 @@ router.patch('/:matricula/status', async (req, res) => {
 });
 
 module.exports = router;
+
