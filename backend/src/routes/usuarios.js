@@ -7,49 +7,51 @@ const autenticar = require('../middleware/autenticar');
 
 const router = express.Router();
 
-// Verifica se já existe algum funcionário cadastrado
+// --------------------------------------------------
+// VERIFICA SE É O PRIMEIRO ACESSO
+// --------------------------------------------------
+
 router.get('/status-inicial', async (req, res) => {
   try {
     const [resultado] = await pool.query(
       'SELECT COUNT(*) AS total FROM usuario'
     );
 
-    const primeiroAcesso = resultado[0].total === 0;
-
     res.json({
-      primeiroAcesso: primeiroAcesso
+      primeiroAcesso: resultado[0].total === 0
     });
-
   } catch (erro) {
     console.error('Erro ao verificar usuários:', erro.message);
-
     res.status(500).json({
       erro: 'Não foi possível verificar os usuários.'
     });
   }
 });
 
-// Cadastra o primeiro funcionário
+// --------------------------------------------------
+// CADASTRA O PRIMEIRO FUNCIONÁRIO
+// --------------------------------------------------
+
 router.post('/primeiro-acesso', async (req, res) => {
   try {
     const { nome, login, senha } = req.body;
 
-    // Validação dos campos
     if (!nome || !login || !senha) {
       return res.status(400).json({
         erro: 'Preencha todos os campos.'
       });
     }
 
-    if (nome.trim().length === 0 ||
-        login.trim().length === 0 ||
-        senha.length < 4) {
+    if (
+      nome.trim().length === 0 ||
+      login.trim().length === 0 ||
+      senha.length < 4
+    ) {
       return res.status(400).json({
         erro: 'Informe nome e login válidos e uma senha com pelo menos 4 caracteres.'
       });
     }
 
-    // Verifica se já existe algum usuário
     const [usuarios] = await pool.query(
       'SELECT COUNT(*) AS total FROM usuario'
     );
@@ -60,19 +62,12 @@ router.post('/primeiro-acesso', async (req, res) => {
       });
     }
 
-    // Protege a senha com bcrypt
     const senhaHash = await bcrypt.hash(senha, 10);
 
-    // Insere o primeiro funcionário
     const [resultado] = await pool.execute(
       `INSERT INTO usuario (nome, login, senhaHash, perfil)
        VALUES (?, ?, ?, ?)`,
-      [
-        nome.trim(),
-        login.trim(),
-        senhaHash,
-        'funcionario'
-      ]
+      [nome.trim(), login.trim(), senhaHash, 'funcionario']
     );
 
     res.status(201).json({
@@ -84,7 +79,6 @@ router.post('/primeiro-acesso', async (req, res) => {
         perfil: 'funcionario'
       }
     });
-
   } catch (erro) {
     console.error('Erro ao cadastrar usuário:', erro.message);
 
@@ -100,10 +94,10 @@ router.post('/primeiro-acesso', async (req, res) => {
   }
 });
 
+// --------------------------------------------------
+// LOGIN
+// --------------------------------------------------
 
-
-
-// Realiza o login do funcionário
 router.post('/login', async (req, res) => {
   try {
     const { login, senha } = req.body;
@@ -114,7 +108,6 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Procura o funcionário pelo login
     const [usuarios] = await pool.execute(
       `SELECT idUsuario, nome, login, senhaHash, perfil
        FROM usuario
@@ -131,7 +124,6 @@ router.post('/login', async (req, res) => {
 
     const usuario = usuarios[0];
 
-    // Compara a senha digitada com o hash do banco
     const senhaCorreta = await bcrypt.compare(
       senha,
       usuario.senhaHash
@@ -143,7 +135,6 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Gera o token de autenticação
     const token = jwt.sign(
       {
         idUsuario: usuario.idUsuario,
@@ -151,14 +142,12 @@ router.post('/login', async (req, res) => {
         perfil: usuario.perfil
       },
       process.env.JWT_SECRET,
-      {
-        expiresIn: '8h'
-      }
+      { expiresIn: '8h' }
     );
 
-    return res.json({
+    res.json({
       mensagem: 'Login realizado com sucesso!',
-      token: token,
+      token,
       usuario: {
         idUsuario: usuario.idUsuario,
         nome: usuario.nome,
@@ -166,17 +155,19 @@ router.post('/login', async (req, res) => {
         perfil: usuario.perfil
       }
     });
-
   } catch (erro) {
     console.error('Erro ao realizar login:', erro.message);
 
-    return res.status(500).json({
+    res.status(500).json({
       erro: 'Não foi possível realizar o login.'
     });
   }
 });
 
-// GET /usuarios/me
+// --------------------------------------------------
+// CONSULTA O FUNCIONÁRIO CONECTADO
+// --------------------------------------------------
+
 router.get('/me', autenticar, (req, res) => {
   res.json({
     mensagem: 'Funcionário autenticado com sucesso!',
@@ -184,5 +175,210 @@ router.get('/me', autenticar, (req, res) => {
   });
 });
 
-module.exports = router;
+// --------------------------------------------------
+// LISTA TODOS OS FUNCIONÁRIOS
+// GET /usuarios
+// --------------------------------------------------
 
+router.get('/', autenticar, async (req, res) => {
+  try {
+    const [usuarios] = await pool.query(
+      `SELECT idUsuario, nome, login, perfil
+       FROM usuario
+       ORDER BY nome ASC`
+    );
+
+    res.json(usuarios);
+  } catch (erro) {
+    console.error('Erro ao listar funcionários:', erro.message);
+
+    res.status(500).json({
+      erro: 'Não foi possível listar os funcionários.'
+    });
+  }
+});
+
+// --------------------------------------------------
+// CADASTRA UM NOVO FUNCIONÁRIO
+// POST /usuarios
+// --------------------------------------------------
+
+router.post('/', autenticar, async (req, res) => {
+  try {
+    const { nome, login, senha } = req.body;
+
+    if (!nome || !login || !senha) {
+      return res.status(400).json({
+        erro: 'Preencha todos os campos.'
+      });
+    }
+
+    if (
+      nome.trim().length === 0 ||
+      login.trim().length === 0 ||
+      senha.length < 4
+    ) {
+      return res.status(400).json({
+        erro: 'Informe nome e login válidos e uma senha com pelo menos 4 caracteres.'
+      });
+    }
+
+    const senhaHash = await bcrypt.hash(senha, 10);
+
+    const [resultado] = await pool.execute(
+      `INSERT INTO usuario (nome, login, senhaHash, perfil)
+       VALUES (?, ?, ?, ?)`,
+      [nome.trim(), login.trim(), senhaHash, 'funcionario']
+    );
+
+    res.status(201).json({
+      mensagem: 'Funcionário cadastrado com sucesso!',
+      usuario: {
+        idUsuario: resultado.insertId,
+        nome: nome.trim(),
+        login: login.trim(),
+        perfil: 'funcionario'
+      }
+    });
+  } catch (erro) {
+    console.error('Erro ao cadastrar funcionário:', erro.message);
+
+    if (erro.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        erro: 'Este login já está cadastrado.'
+      });
+    }
+
+    res.status(500).json({
+      erro: 'Não foi possível cadastrar o funcionário.'
+    });
+  }
+});
+
+// --------------------------------------------------
+// EDITA NOME E LOGIN
+// PUT /usuarios/:id
+// --------------------------------------------------
+
+router.put('/:id', autenticar, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { nome, login } = req.body;
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        erro: 'Identificador de funcionário inválido.'
+      });
+    }
+
+    if (
+      !nome ||
+      !login ||
+      nome.trim().length === 0 ||
+      login.trim().length === 0
+    ) {
+      return res.status(400).json({
+        erro: 'Informe um nome e um login válidos.'
+      });
+    }
+
+    const [resultado] = await pool.execute(
+      `UPDATE usuario
+       SET nome = ?, login = ?
+       WHERE idUsuario = ?`,
+      [nome.trim(), login.trim(), id]
+    );
+
+    if (resultado.affectedRows === 0) {
+      return res.status(404).json({
+        erro: 'Funcionário não encontrado.'
+      });
+    }
+
+    res.json({
+      mensagem: 'Dados do funcionário atualizados com sucesso!'
+    });
+  } catch (erro) {
+    console.error('Erro ao editar funcionário:', erro.message);
+
+    if (erro.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        erro: 'Este login já está sendo utilizado.'
+      });
+    }
+
+    res.status(500).json({
+      erro: 'Não foi possível atualizar o funcionário.'
+    });
+  }
+});
+
+// --------------------------------------------------
+// ALTERA A SENHA DO FUNCIONÁRIO CONECTADO
+// PUT /usuarios/me/senha
+// --------------------------------------------------
+
+router.put('/me/senha', autenticar, async (req, res) => {
+  try {
+    const { senhaAtual, novaSenha } = req.body;
+    const idUsuario = req.usuario.idUsuario;
+
+    if (!senhaAtual || !novaSenha) {
+      return res.status(400).json({
+        erro: 'Informe a senha atual e a nova senha.'
+      });
+    }
+
+    if (novaSenha.length < 4) {
+      return res.status(400).json({
+        erro: 'A nova senha deve ter pelo menos 4 caracteres.'
+      });
+    }
+
+    const [usuarios] = await pool.execute(
+      `SELECT senhaHash
+       FROM usuario
+       WHERE idUsuario = ?
+       LIMIT 1`,
+      [idUsuario]
+    );
+
+    if (usuarios.length === 0) {
+      return res.status(404).json({
+        erro: 'Funcionário não encontrado.'
+      });
+    }
+
+    const senhaCorreta = await bcrypt.compare(
+      senhaAtual,
+      usuarios[0].senhaHash
+    );
+
+    if (!senhaCorreta) {
+      return res.status(401).json({
+        erro: 'A senha atual está incorreta.'
+      });
+    }
+
+    const novoHash = await bcrypt.hash(novaSenha, 10);
+
+    await pool.execute(
+      `UPDATE usuario
+       SET senhaHash = ?
+       WHERE idUsuario = ?`,
+      [novoHash, idUsuario]
+    );
+
+    res.json({
+      mensagem: 'Senha alterada com sucesso!'
+    });
+  } catch (erro) {
+    console.error('Erro ao alterar senha:', erro.message);
+
+    res.status(500).json({
+      erro: 'Não foi possível alterar a senha.'
+    });
+  }
+});
+
+module.exports = router;

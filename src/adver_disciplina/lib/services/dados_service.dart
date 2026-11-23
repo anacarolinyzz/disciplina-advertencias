@@ -365,4 +365,119 @@ class DadosService {
       dados['erro'] ?? 'Não foi possível registrar as advertências.',
     );
   }
+
+  // --------------------------------------------------
+  // FUNCIONÁRIOS / USUÁRIOS
+  // --------------------------------------------------
+
+  Future<List<Map<String, dynamic>>> listarUsuarios() async {
+    final resposta = await http.get(
+      Uri.parse('$_urlApi/usuarios'),
+      headers: await _cabecalhoAutenticado(),
+    );
+
+    final dados = jsonDecode(resposta.body);
+
+    if (resposta.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(dados);
+    }
+
+    if (resposta.statusCode == 401) {
+      throw Exception('Sua sessão expirou. Faça login novamente.');
+    }
+
+    throw Exception(
+      dados['erro'] ?? 'Não foi possível listar os funcionários.',
+    );
+  }
+
+  Future<void> cadastrarUsuario({
+    required String nome,
+    required String login,
+    required String senha,
+  }) async {
+    final resposta = await http.post(
+      Uri.parse('$_urlApi/usuarios'),
+      headers: await _cabecalhoAutenticado(),
+      body: jsonEncode({
+        'nome': nome,
+        'login': login,
+        'senha': senha,
+      }),
+    );
+
+    final dados = jsonDecode(resposta.body);
+
+    if (resposta.statusCode == 201) {
+      return;
+    }
+
+    if (resposta.statusCode == 401) {
+      throw Exception('Sua sessão expirou. Faça login novamente.');
+    }
+
+    throw Exception(
+      dados['erro'] ?? 'Não foi possível cadastrar o funcionário.',
+    );
+  }
+
+  Future<void> atualizarUsuario({
+    required int id,
+    required String nome,
+    required String login,
+  }) async {
+    final resposta = await http.put(
+      Uri.parse('$_urlApi/usuarios/$id'),
+      headers: await _cabecalhoAutenticado(),
+      body: jsonEncode({
+        'nome': nome,
+        'login': login,
+      }),
+    );
+
+    final dados = jsonDecode(resposta.body);
+
+    if (resposta.statusCode == 200) {
+      return;
+    }
+
+    if (resposta.statusCode == 401) {
+      throw Exception('Sua sessão expirou. Faça login novamente.');
+    }
+
+    throw Exception(
+      dados['erro'] ?? 'Não foi possível atualizar o funcionário.',
+    );
+  }
+
+  Future<void> alterarMinhaSenha({
+    required String senhaAtual,
+    required String novaSenha,
+  }) async {
+    final resposta = await http.put(
+      Uri.parse('$_urlApi/usuarios/me/senha'),
+      headers: await _cabecalhoAutenticado(),
+      body: jsonEncode({
+        'senhaAtual': senhaAtual,
+        'novaSenha': novaSenha,
+      }),
+    );
+
+    final dados = jsonDecode(resposta.body);
+
+    if (resposta.statusCode == 200) {
+      return;
+    }
+
+    if (resposta.statusCode == 401) {
+      throw Exception(
+        dados['erro'] ?? 'A senha atual está incorreta.',
+      );
+    }
+
+    throw Exception(
+      dados['erro'] ?? 'Não foi possível alterar a senha.',
+    );
+  }
+
 }
