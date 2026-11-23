@@ -21,9 +21,9 @@ class DadosService {
 
   Future<void>? _inicializacao;
 
-  // --------------------------------------------------
+
   // INICIALIZAÇÃO DOS DADOS LOCAIS
-  // --------------------------------------------------
+ 
 
   Future<void> inicializar() {
     return _inicializacao ??= _carregarDadosIniciais();
@@ -55,9 +55,9 @@ class DadosService {
     );
   }
 
-  // --------------------------------------------------
+
   // AUTENTICAÇÃO E SESSÃO
-  // --------------------------------------------------
+
 
   Future<Map<String, dynamic>> fazerLogin(
     String login,
@@ -137,9 +137,9 @@ class DadosService {
     };
   }
 
-  // --------------------------------------------------
+
   // ALUNOS
-  // --------------------------------------------------
+
 
   Future<List<Aluno>> listarAlunos() async {
     final resposta = await http.get(
@@ -270,9 +270,9 @@ class DadosService {
     );
   }
 
-  // --------------------------------------------------
+
   // ADVERTÊNCIAS
-  // --------------------------------------------------
+
 
   Future<List<Advertencia>> listarAdvertencias() async {
     final resposta = await http.get(
@@ -366,9 +366,8 @@ class DadosService {
     );
   }
 
-  // --------------------------------------------------
   // FUNCIONÁRIOS / USUÁRIOS
-  // --------------------------------------------------
+
 
   Future<List<Map<String, dynamic>>> listarUsuarios() async {
     final resposta = await http.get(
@@ -479,5 +478,27 @@ class DadosService {
       dados['erro'] ?? 'Não foi possível alterar a senha.',
     );
   }
+
+Future<List<Map<String, dynamic>>> listarRankingUsuarios() async {
+  final resposta = await http.get(
+    Uri.parse('$_urlApi/advertencias/ranking/usuarios'),
+    headers: await _cabecalhoAutenticado(),
+  );
+
+  final dados = jsonDecode(resposta.body);
+
+  if (resposta.statusCode == 200) {
+    return List<Map<String, dynamic>>.from(dados);
+  }
+
+  if (resposta.statusCode == 401) {
+    throw Exception('Sua sessão expirou. Faça login novamente.');
+  }
+
+  throw Exception(
+    dados['erro'] ?? 'Não foi possível carregar o ranking.',
+  );
+}
+
 
 }

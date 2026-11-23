@@ -228,4 +228,37 @@ router.get('/', autenticar, async (req, res) => {
   }
 });
 
+
+// GET /advertencias/ranking/usuarios
+// Retorna o ranking mensal de funcionários
+router.get('/ranking/usuarios', autenticar, async (req, res) => {
+  try {
+    const [ranking] = await pool.query(`
+      SELECT
+        u.idUsuario,
+        u.nome,
+        COUNT(a.idAdvertencia) AS total
+      FROM usuario u
+      LEFT JOIN advertencia a
+        ON a.idUsuario = u.idUsuario
+        AND a.data_advertencia >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+        AND a.data_advertencia < DATE_ADD(
+          DATE_FORMAT(CURDATE(), '%Y-%m-01'),
+          INTERVAL 1 MONTH
+        )
+      GROUP BY u.idUsuario, u.nome
+      ORDER BY total DESC, u.nome ASC
+    `);
+
+    return res.json(ranking);
+  } catch (erro) {
+    console.error('Erro ao buscar ranking de usuários:', erro);
+
+    return res.status(500).json({
+      erro: 'Não foi possível carregar o ranking de funcionários.'
+    });
+  }
+});
+
+
 module.exports = router;
