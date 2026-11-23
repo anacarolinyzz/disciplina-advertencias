@@ -42,10 +42,10 @@ dependencies:
   file_picker: ^13.3.3
   excel_plus: ^2.29.3
   http: ^1.6.0
-<<<<<<< HEAD
+
   archive: ^4.7.1
-=======
->>>>>>> f55dcdda65f565400c644ce39a3c73b41c0e4b69
+
+
 
 dev_dependencies:
   flutter_test:
