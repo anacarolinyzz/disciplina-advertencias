@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import 'package:adver/services/dados_service.dart';
@@ -10,7 +9,7 @@ import 'package:adver/widget/advertencia/secao_dados_advertencia.dart';
 import 'package:adver/models/advertencia.dart';
 import 'package:adver/services/pdf_service.dart';
 import 'package:adver/services/zip_service.dart';
-
+import 'package:adver/models/justificativas_legais.dart';
 
 
 
@@ -306,11 +305,12 @@ Future<void> _salvarAdvertenciasEmLote() async {
 
     try {
       pdfsComErro = await ZipService.gerarEbaixarAdvertencias(
-        alunos: alunosSelecionados,
-        data: data,
-        justificativa: justificativa,
-        descricao: descricao,
-      );
+  alunos: alunosSelecionados,
+  data: data,
+  justificativa: justificativa,
+  descricao: descricao,
+  tipoMedida: _tipoSelecionado!,
+);
     } catch (erroZip) {
       if (!mounted) return;
 
@@ -481,6 +481,7 @@ Future<void> _salvarEGerarPDF() async {
         justificativa: _justificativaSelecionada!,
         descricao: _descricaoController.text.trim(),
         funcionarioNome: funcionarioNome,
+        tipoMedida: _tipoSelecionado!,
       );
     } catch (erroPdf) {
       if (!mounted) return;

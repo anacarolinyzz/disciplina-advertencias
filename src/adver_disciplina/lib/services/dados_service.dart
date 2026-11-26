@@ -23,7 +23,8 @@ class DadosService {
 
 
   // INICIALIZAÇÃO DOS DADOS LOCAIS
- 
+
+
 
   Future<void> inicializar() {
     return _inicializacao ??= _carregarDadosIniciais();
