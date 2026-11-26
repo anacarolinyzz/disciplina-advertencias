@@ -297,6 +297,30 @@ class DadosService {
     );
   }
 
+
+Future<void> excluirAdvertencia(String id) async {
+  final resposta = await http.delete(
+    Uri.parse('$_urlApi/advertencias/$id'),
+    headers: await _cabecalhoAutenticado(),
+  );
+
+  final dados = jsonDecode(resposta.body);
+
+  if (resposta.statusCode == 200) {
+    return;
+  }
+
+  if (resposta.statusCode == 401) {
+    throw Exception('Sua sessão expirou. Faça login novamente.');
+  }
+
+  throw Exception(
+    dados['erro'] ?? 'Não foi possível excluir a advertência.',
+  );
+}
+
+
+
   Future<void> salvarAdvertencia(
     Advertencia advertencia,
   ) async {

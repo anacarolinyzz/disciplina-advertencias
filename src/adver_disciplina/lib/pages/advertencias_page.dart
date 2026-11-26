@@ -34,14 +34,11 @@ class _AdvertenciaPageState extends State<AdvertenciaPage> {
   );
   final _descricaoController = TextEditingController();
 
-  String? _justificativaSelecionada;
-  final List<String> _justificativas = [
-    'Uso de celular em sala sem autorização',
-    'Ausência de fardamento/uniforme escolar',
-    'Atraso injustificado',
-    'Descumprimento das normas do IFPI',
-    'Outro (especificar na descrição)',
-  ];
+  String? _tipoSelecionado;
+String? _justificativaSelecionada;
+
+List<String> get _justificativas =>
+    JustificativasLegais.obterTextos(_tipoSelecionado);
 
   
   String? _alunoNome;
@@ -147,16 +144,30 @@ Future<void> _carregarAlunosDoJson() async {
                     const Divider(),
                     const SizedBox(height: 16),
                     SecaoDadosAdvertencia(
-                      emLote: _emLote,
-                      dataController: _dataController,
-                      descricaoController: _descricaoController,
-                      justificativaSelecionada: _justificativaSelecionada,
-                      justificativas: _justificativas,
-                      onJustificativaChanged: (val) => setState(() => _justificativaSelecionada = val),
-                      curso: _alunoCurso,
-                      turma: _alunoTurma,
-                      matricula: _alunoMatricula,
-                    ),
+  emLote: _emLote,
+  dataController: _dataController,
+  descricaoController: _descricaoController,
+
+  tipoSelecionado: _tipoSelecionado,
+  onTipoChanged: (tipo) {
+    setState(() {
+      _tipoSelecionado = tipo;
+      _justificativaSelecionada = null;
+    });
+  },
+
+  justificativaSelecionada: _justificativaSelecionada,
+  justificativas: _justificativas,
+  onJustificativaChanged: (valor) {
+    setState(() {
+      _justificativaSelecionada = valor;
+    });
+  },
+
+  curso: _alunoCurso,
+  turma: _alunoTurma,
+  matricula: _alunoMatricula,
+),
                   ],
                 ),
               ),
@@ -228,6 +239,14 @@ Future<void> _salvarAdvertenciasEmLote() async {
     );
     return;
   }
+  if (_tipoSelecionado == null) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Selecione o tipo de medida disciplinar.'),
+    ),
+  );
+  return;
+}
 
   DateTime data;
 
@@ -391,6 +410,14 @@ Future<void> _salvarEGerarPDF() async {
     );
     return;
   }
+  if (_tipoSelecionado == null) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Selecione o tipo de medida disciplinar.'),
+    ),
+  );
+  return;
+}
 
   // Converter data
   DateTime data;
@@ -512,8 +539,10 @@ Future<void> _salvarEGerarPDF() async {
     _alunoTurma = 'Selecione o aluno';
     _alunoMatricula = 'Selecione o aluno';
 
-    _alunosEmLote.clear();
-    _justificativaSelecionada = null;
+   _alunosEmLote.clear();
+_tipoSelecionado = null;
+_justificativaSelecionada = null;
+    
 
     _dataController.text =
         "${DateTime.now().day.toString().padLeft(2, '0')}/${DateTime.now().month.toString().padLeft(2, '0')}/${DateTime.now().year}";

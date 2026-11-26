@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 
 import 'package:adver/widget/navigation_drawer.dart';
@@ -25,6 +26,7 @@ class _RelatorioPageState extends State<RelatorioPage> {
   List<Advertencia> _advertencias = [];
 
   bool _carregando = true;
+  bool _excluindo = false;
   String? _erro;
 
   String _tipoRelatorio = 'Turma';
@@ -52,6 +54,7 @@ class _RelatorioPageState extends State<RelatorioPage> {
         _alunos = alunos;
         _advertencias = advertencias;
         _carregando = false;
+        _erro = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -60,6 +63,78 @@ class _RelatorioPageState extends State<RelatorioPage> {
         _erro = 'Não foi possível carregar os dados.';
         _carregando = false;
       });
+    }
+  }
+
+  // CONFIRMAR E EXCLUIR ADVERTÊNCIA
+  Future<void> _confirmarExclusao(
+    Advertencia advertencia,
+    String nomeAluno,
+  ) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Excluir advertência?'),
+          content: Text(
+            'Deseja realmente excluir a advertência de $nomeAluno?\n\n'
+            'Essa ação não poderá ser desfeita.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Excluir'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmar != true || !mounted) return;
+
+    setState(() {
+      _excluindo = true;
+    });
+
+    try {
+      await DadosService.instancia.excluirAdvertencia(advertencia.id);
+
+      // Atualiza os registros depois da exclusão.
+      await _carregarDados();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Advertência excluída com sucesso!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Não foi possível excluir a advertência: $e',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _excluindo = false;
+        });
+      }
     }
   }
 
@@ -131,8 +206,6 @@ class _RelatorioPageState extends State<RelatorioPage> {
     final advertencias = List<Advertencia>.from(_advertenciasFiltradas);
     final contagem = _contagemPorAluno;
 
-    // No relatório por quantidade, considera apenas alunos que
-    // atingiram a quantidade mínima selecionada.
     if (_tipoRelatorio == 'Quantidade') {
       advertencias.removeWhere((advertencia) {
         return (contagem[advertencia.matriculaAluno] ?? 0) <
@@ -217,6 +290,23 @@ class _RelatorioPageState extends State<RelatorioPage> {
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
+
+        // NOVA COLUNA: AÇÃO DE EXCLUIR
+        DataCell(
+          IconButton(
+            tooltip: 'Excluir advertência',
+            icon: const Icon(
+              Icons.delete_outline,
+              color: Colors.red,
+            ),
+            onPressed: _excluindo
+                ? null
+                : () => _confirmarExclusao(
+                      advertencia,
+                      aluno?.nome ?? 'Aluno não encontrado',
+                    ),
+          ),
+        ),
       ]);
     }).toList();
   }
@@ -229,6 +319,7 @@ class _RelatorioPageState extends State<RelatorioPage> {
       DataColumn(label: Text('Turma')),
       DataColumn(label: Text('Justificativa')),
       DataColumn(label: Text('Quantidade')),
+      DataColumn(label: Text('Ações')),
     ];
   }
 
@@ -289,7 +380,6 @@ class _RelatorioPageState extends State<RelatorioPage> {
 
   Future<void> _gerarPdf() async {
     final advertencias = _advertenciasParaRelatorio();
-    
 
     if (advertencias.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -335,7 +425,7 @@ class _RelatorioPageState extends State<RelatorioPage> {
       appBar: AppbarPrincipal(),
       drawer: DrawerTest(),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _carregando ? null : _gerarPdf,
+        onPressed: _carregando || _excluindo ? null : _gerarPdf,
         icon: const Icon(Icons.picture_as_pdf),
         label: const Text('Gerar relatório em PDF'),
       ),

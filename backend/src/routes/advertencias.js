@@ -261,4 +261,41 @@ router.get('/ranking/usuarios', autenticar, async (req, res) => {
 });
 
 
+// DELETE /advertencias/:id
+// Exclui uma advertência pelo seu identificador
+router.delete('/:id', autenticar, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        erro: 'Identificador de advertência inválido.'
+      });
+    }
+
+    const [resultado] = await pool.execute(
+      'DELETE FROM advertencia WHERE idAdvertencia = ?',
+      [id]
+    );
+
+    if (resultado.affectedRows === 0) {
+      return res.status(404).json({
+        erro: 'Advertência não encontrada.'
+      });
+    }
+
+    return res.json({
+      mensagem: 'Advertência excluída com sucesso!',
+      idAdvertencia: id
+    });
+  } catch (erro) {
+    console.error('Erro ao excluir advertência:', erro);
+
+    return res.status(500).json({
+      erro: 'Não foi possível excluir a advertência.'
+    });
+  }
+});
+
+
 module.exports = router;

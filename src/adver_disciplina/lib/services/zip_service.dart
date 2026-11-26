@@ -15,6 +15,7 @@ class ZipService {
     required DateTime data,
     required String justificativa,
     required String descricao,
+    required String tipoMedida,
   }) async {
     final arquivoZip = Archive();
     final List<String> pdfsComErro = [];
@@ -33,6 +34,7 @@ class ZipService {
           justificativa: justificativa,
           descricao: descricao,
           funcionarioNome: '',
+          tipoMedida: tipoMedida,
         );
 
         final nomeArquivo = _nomeSeguro('${matricula}_$nome');
@@ -61,7 +63,7 @@ class ZipService {
 
     _baixarArquivo(
       Uint8List.fromList(bytesZip),
-      'Advertencias_${_dataParaNome(data)}.zip',
+      'Medidas_Disciplinares_${_dataParaNome(data)}.zip',
     );
 
     return pdfsComErro;
@@ -72,7 +74,7 @@ class ZipService {
         .trim()
         .replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
 
-    return nomeLimpo.isEmpty ? 'advertencia' : nomeLimpo;
+    return nomeLimpo.isEmpty ? 'medida_disciplinar' : nomeLimpo;
   }
 
   static String _dataParaNome(DateTime data) {
@@ -82,7 +84,10 @@ class ZipService {
     return '${data.year}-$mes-$dia';
   }
 
-  static void _baixarArquivo(Uint8List bytes, String nomeArquivo) {
+  static void _baixarArquivo(
+    Uint8List bytes,
+    String nomeArquivo,
+  ) {
     final blob = html.Blob([bytes], 'application/zip');
     final url = html.Url.createObjectUrlFromBlob(blob);
 
@@ -94,7 +99,6 @@ class ZipService {
     link.click();
     link.remove();
 
-    // Revoga a URL depois que o navegador iniciar o download.
     Future.delayed(const Duration(seconds: 1), () {
       html.Url.revokeObjectUrl(url);
     });
